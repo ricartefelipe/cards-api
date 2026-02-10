@@ -1,12 +1,12 @@
 services:
   mysql:
-    image: mysql:8.0
+    image: mariadb:10.11
     container_name: cards-api-mysql
     environment:
-      MYSQL_DATABASE: cards_api
-      MYSQL_USER: cards
-      MYSQL_PASSWORD: cards
-      MYSQL_ROOT_PASSWORD: root
+      MARIADB_DATABASE: cards_api
+      MARIADB_USER: cards
+      MARIADB_PASSWORD: cards
+      MARIADB_ROOT_PASSWORD: root
     ports:
       - "3306:3306"
     command:
