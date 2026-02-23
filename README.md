@@ -6,6 +6,7 @@ API para gestão de Conta, Cliente e Cartões (físico e virtual), com webhooks 
 
 - O endpoint de consulta de CVV sempre consulta a processadora via adapter.
 - Webhooks exigem API Key via header `X-Webhook-Api-Key`.
+- Endpoints de conta e cartões exigem autenticação OAuth2 + JWT (Keycloak).
 - A aplicação não registra CVV em logs.
 
 ## Requisitos
@@ -28,6 +29,11 @@ Banco local (docker-compose):
 - password: cards
 - root password: root
 
+Keycloak (docker-compose, opcional em dev):
+- URL: http://localhost:8180
+- Admin: admin/admin
+- Realm `quarkus` importado automaticamente com client `backend-service` e usuários alice, admin
+
 ## Configuração
 
 As configurações abaixo possuem default para ambiente local.
@@ -35,6 +41,14 @@ As configurações abaixo possuem default para ambiente local.
 ```bash
 export CARRIER_WEBHOOK_API_KEY=carrier-local-key
 export PROCESSOR_WEBHOOK_API_KEY=processor-local-key
+```
+
+OAuth2/Keycloak (produção):
+
+```bash
+export KEYCLOAK_URL=http://localhost:8180
+export KEYCLOAK_REALM=quarkus
+export KEYCLOAK_CLIENT_SECRET=secret
 ```
 
 Opcional:
@@ -52,6 +66,8 @@ export CVV_DEFAULT_TTL_SECONDS=900
 mvn quarkus:dev
 ```
 
+Em modo dev, o **Dev Services** inicia automaticamente um Keycloak e importa o realm `quarkus` com usuários pré-configurados.
+
 Flyway aplica as migrations automaticamente no startup.
 
 OpenAPI:
@@ -64,12 +80,36 @@ OpenAPI:
 mvn test
 ```
 
+## Autenticação OAuth2 + JWT
+
+Os endpoints `/accounts`, `/physical-cards` e `/virtual-cards` exigem Bearer token JWT válido. Os webhooks continuam usando API Key.
+
+### Obter token (Keycloak)
+
+```bash
+export ACCESS_TOKEN=$(curl -s -X POST "http://localhost:8180/realms/quarkus/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -u "backend-service:secret" \
+  -d "username=alice&password=alice&grant_type=password" | jq -r '.access_token')
+```
+
+Usuários de exemplo: `alice`/`alice` (role user), `admin`/`admin` (roles user, admin).
+
+### Chamadas autenticadas
+
+```bash
+curl -s -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8080/accounts
+```
+
 ## Fluxo principal via curl
 
 ### 1) Criar conta (cria customer + account + emite físico e gera tracking)
 
 ```bash
-curl -s -X POST http://localhost:8080/accounts   -H 'Content-Type: application/json'   -d '{
+curl -s -X POST http://localhost:8080/accounts \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{
     "customer": {
       "full_name": "Fulano de Tal",
       "document": "12345678900",
@@ -104,13 +144,15 @@ curl -s -X POST http://localhost:8080/webhooks/carrier/delivery   -H 'Content-Ty
 ### 3) Validar cartão físico (após entregue)
 
 ```bash
-curl -s -X POST http://localhost:8080/physical-cards/PHYSICAL_CARD_ID/validate
+curl -s -X POST http://localhost:8080/physical-cards/PHYSICAL_CARD_ID/validate \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
 ### 4) Emitir cartão virtual (exige físico entregue e validado)
 
 ```bash
-curl -s -X POST http://localhost:8080/accounts/ACCOUNT_ID/virtual-cards
+curl -s -X POST http://localhost:8080/accounts/ACCOUNT_ID/virtual-cards \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
 Resposta contém `virtual_card_id` e `processor_card_id`.
@@ -118,7 +160,8 @@ Resposta contém `virtual_card_id` e `processor_card_id`.
 ### 5) Consultar CVV do cartão virtual (on demand)
 
 ```bash
-curl -s http://localhost:8080/virtual-cards/VIRTUAL_CARD_ID/cvv
+curl -s http://localhost:8080/virtual-cards/VIRTUAL_CARD_ID/cvv \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
 Resposta contém `cvv` e `expiration_date`.
@@ -139,13 +182,17 @@ O CVV recebido é mantido apenas na memória do processo, com TTL até `expirati
 ### 7) Reemitir físico (perda/roubo/dano)
 
 ```bash
-curl -s -X POST http://localhost:8080/physical-cards/PHYSICAL_CARD_ID/reissue   -H 'Content-Type: application/json'   -d '{ "reason": "LOSS" }'
+curl -s -X POST http://localhost:8080/physical-cards/PHYSICAL_CARD_ID/reissue \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{ "reason": "LOSS" }'
 ```
 
 ### 8) Cancelar conta (desativa conta e cartões)
 
 ```bash
-curl -s -X POST http://localhost:8080/accounts/ACCOUNT_ID/cancel
+curl -s -X POST http://localhost:8080/accounts/ACCOUNT_ID/cancel \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
 Após cancelamento, emissão de cartões e consulta de CVV são bloqueadas.
