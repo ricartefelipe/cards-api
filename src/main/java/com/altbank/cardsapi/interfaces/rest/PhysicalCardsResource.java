@@ -1,5 +1,6 @@
 package com.altbank.cardsapi.interfaces.rest;
 
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import com.altbank.cardsapi.application.dto.ReissuePhysicalCardRequest;
@@ -18,7 +19,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 @ApplicationScoped
-
+@RolesAllowed("user")
 @Path("/physical-cards")
 @Produces(MediaType.APPLICATION_JSON)
 public class PhysicalCardsResource {
