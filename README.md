@@ -1,6 +1,6 @@
 # cards-api
 
-API para gestão de Conta, Cliente e Cartões (físico e virtual), com webhooks de transportadora e processadora e simulação local de processadora com CVV somente em memória.
+API REST (Quarkus) para gestão de Conta, Cliente e Cartões (físico e virtual), com webhooks de transportadora e processadora e simulação local de processadora com CVV somente em memória.
 
 ## Premissas de segurança
 
@@ -13,7 +13,7 @@ API para gestão de Conta, Cliente e Cartões (físico e virtual), com webhooks 
 
 - Java 21
 - Maven
-- Docker (para MySQL local)
+- Docker (serviços locais em `docker-compose.yml`: MariaDB e Keycloak opcional/fora dos Dev Services)
 
 ## Subindo dependências
 
@@ -21,7 +21,7 @@ API para gestão de Conta, Cliente e Cartões (físico e virtual), com webhooks 
 docker compose up -d
 ```
 
-Banco local (docker-compose):
+Banco local (MariaDB no compose — serviço `mysql`; driver JDBC padrão `jdbc:mariadb://`):
 - host: localhost
 - porta: 3306
 - database: cards_api
@@ -54,7 +54,7 @@ export KEYCLOAK_CLIENT_SECRET=secret
 Opcional:
 
 ```bash
-export DB_JDBC_URL="jdbc:mysql://localhost:3306/cards_api?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+export DB_JDBC_URL="jdbc:mariadb://localhost:3306/cards_api?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
 export DB_USERNAME=cards
 export DB_PASSWORD=cards
 export CVV_DEFAULT_TTL_SECONDS=900
@@ -66,9 +66,18 @@ export CVV_DEFAULT_TTL_SECONDS=900
 mvn quarkus:dev
 ```
 
-Em modo dev, o **Dev Services** inicia automaticamente um Keycloak e importa o realm `quarkus` com usuários pré-configurados.
-
 Flyway aplica as migrations automaticamente no startup.
+
+Em modo dev, por omissão podem correr **Dev Services** (por exemplo Keycloak com o realm `quarkus`); se optar por infraestrutura apenas via **Docker Compose**, veja a secção seguinte para evitar sobreposição nas portas **3306** e **8180**.
+
+### Docker Compose versus Dev Services
+
+- O Compose deste repositório usa usualmente **MariaDB na porta 3306** e **Keycloak na 8180** (`docker compose up -d`).
+- Com **`mvn quarkus:dev`**, o Quarkus pode iniciar **contentores próprios** (Dev Services) para base de dados e OIDC, consoante as extensões e se já há algo à escuta nas portas envolvidas.
+- Para **evitar duplicar serviços ou falhas por porta em uso**:
+  - Se quiser usar **só** o MariaDB e o Keycloak do **Compose**, desative no perfil `dev` os Dev Services que repetem o mesmo papel, por exemplo `quarkus.datasource.devservices.enabled=false` e `quarkus.keycloak.devservices.enabled=false`.
+  - Alinhe o **OIDC** ao Keycloak que está a usar (URL do realm). Neste repo, `quarkus.oidc.auth-server-url` está sob o perfil **`%prod`**; em dev o fluxo típico passa pelo Keycloak dos Dev Services ou por configuração extra local (`KEYCLOAK_URL`, ficheiros de perfil ignorados pelo Git, etc.).
+- Na prática: **não combine** dois Keycloaks ou duas bases a disputar **a mesma porta** (3306, 8180) sem configurar uma das partes explicitamente para outra porta ou para ficar desligada.
 
 OpenAPI:
 - http://localhost:8080/openapi
@@ -79,6 +88,8 @@ OpenAPI:
 ```bash
 mvn test
 ```
+
+Após os testes, o JaCoCo gera relatório HTML de cobertura em `target/site/jacoco/index.html`.
 
 ## Autenticação OAuth2 + JWT
 
@@ -188,7 +199,20 @@ curl -s -X POST http://localhost:8080/physical-cards/PHYSICAL_CARD_ID/reissue \
   -d '{ "reason": "LOSS" }'
 ```
 
-### 8) Cancelar conta (desativa conta e cartões)
+Motivos válidos (`reason`): `LOSS`, `THEFT`, `DAMAGE`.
+
+### 8) Reemitir cartão virtual (perda/roubo/dano)
+
+```bash
+curl -s -X POST http://localhost:8080/virtual-cards/VIRTUAL_CARD_ID/reissue \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{ "reason": "THEFT" }'
+```
+
+Motivos válidos (`reason`): `LOSS`, `THEFT`, `DAMAGE`.
+
+### 9) Cancelar conta (desativa conta e cartões)
 
 ```bash
 curl -s -X POST http://localhost:8080/accounts/ACCOUNT_ID/cancel \

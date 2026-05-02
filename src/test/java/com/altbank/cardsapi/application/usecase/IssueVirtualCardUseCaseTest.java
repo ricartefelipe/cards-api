@@ -2,20 +2,16 @@ package com.altbank.cardsapi.application.usecase;
 
 import com.altbank.cardsapi.application.exception.ConflictException;
 import com.altbank.cardsapi.application.exception.ErrorCode;
+import com.altbank.cardsapi.application.exception.ForbiddenException;
+import com.altbank.cardsapi.application.exception.NotFoundException;
 import com.altbank.cardsapi.application.port.AccountRepository;
 import com.altbank.cardsapi.application.port.PhysicalCardRepository;
 import com.altbank.cardsapi.application.port.ProcessorPort;
 import com.altbank.cardsapi.application.port.VirtualCardRepository;
 import com.altbank.cardsapi.domain.model.Account;
-import com.altbank.cardsapi.domain.model.Address;
-import com.altbank.cardsapi.domain.model.Customer;
-import com.altbank.cardsapi.domain.model.DeliveryStatus;
 import com.altbank.cardsapi.domain.model.PhysicalCard;
 import com.altbank.cardsapi.domain.model.VirtualCard;
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Assertions;
@@ -24,7 +20,18 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import static org.mockito.Mockito.*;
+
+import static com.altbank.cardsapi.CardsTestFixtures.CLOCK;
+import static com.altbank.cardsapi.CardsTestFixtures.activeAccount;
+import static com.altbank.cardsapi.CardsTestFixtures.activePhysicalDeliveredNotValidated;
+import static com.altbank.cardsapi.CardsTestFixtures.activePhysicalDeliveredValidated;
+import static com.altbank.cardsapi.CardsTestFixtures.activePhysicalUndelivered;
+import static com.altbank.cardsapi.CardsTestFixtures.activeVirtual;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class IssueVirtualCardUseCaseTest {
@@ -41,20 +48,52 @@ class IssueVirtualCardUseCaseTest {
     @Mock
     ProcessorPort processorPort;
 
-    private final Clock clock = Clock.fixed(Instant.parse("2026-01-31T12:00:00Z"), ZoneOffset.UTC);
+    @Test
+    void issue_whenAccountMissing_shouldFail() {
+        UUID id = UUID.randomUUID();
+        when(accountRepository.findById(id)).thenReturn(Optional.empty());
+
+        IssueVirtualCardUseCase useCase =
+                new IssueVirtualCardUseCase(accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+
+        NotFoundException ex = Assertions.assertThrows(NotFoundException.class, () -> useCase.issue(id));
+        Assertions.assertEquals(ErrorCode.ACCOUNT_NOT_FOUND, ex.errorCode());
+        verifyNoInteractions(processorPort);
+    }
+
+    @Test
+    void issue_whenAccountCancelled_shouldFail() {
+        Account account = activeAccount();
+        account.cancel(CLOCK);
+
+        when(accountRepository.findById(account.id())).thenReturn(Optional.of(account));
+
+        IssueVirtualCardUseCase useCase =
+                new IssueVirtualCardUseCase(accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+
+        ForbiddenException ex = Assertions.assertThrows(ForbiddenException.class, () -> useCase.issue(account.id()));
+        Assertions.assertEquals(ErrorCode.ACCOUNT_CANCELLED, ex.errorCode());
+        verify(physicalCardRepository, never()).findActiveByAccountId(account.id());
+    }
+
+    @Test
+    void issue_whenNoPhysicalCard_shouldFail() {
+        Account account = activeAccount();
+
+        when(accountRepository.findById(account.id())).thenReturn(Optional.of(account));
+        when(physicalCardRepository.findActiveByAccountId(account.id())).thenReturn(Optional.empty());
+
+        IssueVirtualCardUseCase useCase =
+                new IssueVirtualCardUseCase(accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+
+        NotFoundException ex = Assertions.assertThrows(NotFoundException.class, () -> useCase.issue(account.id()));
+        Assertions.assertEquals(ErrorCode.CARD_NOT_FOUND, ex.errorCode());
+    }
 
     @Test
     void issueVirtualCard_beforeDeliveryAndValidation_shouldFail() {
-        Account account = sampleAccount();
-        PhysicalCard physicalCard = new PhysicalCard(
-                account,
-                "trk_123",
-                DeliveryStatus.SHIPPED,
-                account.customer().address().asSingleLine(),
-                null,
-                null,
-                clock
-        );
+        Account account = activeAccount();
+        PhysicalCard physicalCard = activePhysicalUndelivered(account);
 
         UUID accountId = account.id();
 
@@ -62,40 +101,54 @@ class IssueVirtualCardUseCaseTest {
         when(physicalCardRepository.findActiveByAccountId(accountId)).thenReturn(Optional.of(physicalCard));
 
         IssueVirtualCardUseCase useCase = new IssueVirtualCardUseCase(
-                accountRepository,
-                physicalCardRepository,
-                virtualCardRepository,
-                processorPort,
-                clock
-        );
+                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
 
         ConflictException ex = Assertions.assertThrows(ConflictException.class, () -> useCase.issue(accountId));
         Assertions.assertEquals(ErrorCode.PHYSICAL_CARD_NOT_DELIVERED, ex.errorCode());
         verifyNoInteractions(processorPort);
-        verify(virtualCardRepository, never()).findActiveByAccountId(any());
+        verify(virtualCardRepository, never()).findActiveByAccountId(accountId);
         verify(virtualCardRepository, never()).persist(any(VirtualCard.class));
     }
 
     @Test
+    void issue_whenDeliveredButNotValidated_shouldFail() {
+        Account account = activeAccount();
+        PhysicalCard physical = activePhysicalDeliveredNotValidated(account);
+
+        when(accountRepository.findById(account.id())).thenReturn(Optional.of(account));
+        when(physicalCardRepository.findActiveByAccountId(account.id())).thenReturn(Optional.of(physical));
+
+        IssueVirtualCardUseCase useCase = new IssueVirtualCardUseCase(
+                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+
+        ConflictException ex = Assertions.assertThrows(ConflictException.class, () -> useCase.issue(account.id()));
+        Assertions.assertEquals(ErrorCode.PHYSICAL_CARD_NOT_VALIDATED, ex.errorCode());
+        verifyNoInteractions(processorPort);
+    }
+
+    @Test
+    void issue_whenVirtualAlreadyActive_shouldFail() {
+        Account account = activeAccount();
+        PhysicalCard physical = activePhysicalDeliveredValidated(account);
+
+        VirtualCard existing = activeVirtual(account, "pc_existing");
+
+        when(accountRepository.findById(account.id())).thenReturn(Optional.of(account));
+        when(physicalCardRepository.findActiveByAccountId(account.id())).thenReturn(Optional.of(physical));
+        when(virtualCardRepository.findActiveByAccountId(account.id())).thenReturn(Optional.of(existing));
+
+        IssueVirtualCardUseCase useCase = new IssueVirtualCardUseCase(
+                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+
+        ConflictException ex = Assertions.assertThrows(ConflictException.class, () -> useCase.issue(account.id()));
+        Assertions.assertEquals(ErrorCode.VIRTUAL_CARD_ALREADY_EXISTS, ex.errorCode());
+        verifyNoInteractions(processorPort);
+    }
+
+    @Test
     void issueVirtualCard_afterDeliveryAndValidation_shouldSucceed() {
-        Account account = sampleAccount();
-        PhysicalCard physicalCard = new PhysicalCard(
-                account,
-                "trk_123",
-                DeliveryStatus.SHIPPED,
-                account.customer().address().asSingleLine(),
-                null,
-                null,
-                clock
-        );
-        physicalCard.applyCarrierDeliveryUpdate(
-                DeliveryStatus.DELIVERED,
-                LocalDateTime.of(2026, 1, 31, 12, 0, 0),
-                null,
-                account.customer().address().asSingleLine(),
-                clock
-        );
-        physicalCard.validate(clock);
+        Account account = activeAccount();
+        PhysicalCard physicalCard = activePhysicalDeliveredValidated(account);
 
         UUID accountId = account.id();
 
@@ -106,12 +159,7 @@ class IssueVirtualCardUseCaseTest {
                 .thenReturn(new ProcessorPort.IssuedVirtualCard(accountId.toString(), "pc_abc", LocalDateTime.of(2026, 1, 31, 12, 15, 0)));
 
         IssueVirtualCardUseCase useCase = new IssueVirtualCardUseCase(
-                accountRepository,
-                physicalCardRepository,
-                virtualCardRepository,
-                processorPort,
-                clock
-        );
+                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
 
         var response = useCase.issue(accountId);
 
@@ -124,11 +172,5 @@ class IssueVirtualCardUseCaseTest {
         Assertions.assertEquals("pc_abc", persisted.processorCardId());
         Assertions.assertEquals(accountId.toString(), persisted.processorAccountId());
         verify(processorPort).issueVirtualCard(accountId.toString());
-    }
-
-    private Account sampleAccount() {
-        Address address = new Address("Rua A", "100", "Fortaleza", "CE", "60000-000", "BR");
-        Customer customer = new Customer("Fulano", "12345678900", "fulano@example.com", null, address, clock);
-        return new Account(customer, clock);
     }
 }
