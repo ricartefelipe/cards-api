@@ -28,7 +28,6 @@ public class PhysicalCardsResource {
     private final ReissuePhysicalCardUseCase reissuePhysicalCardUseCase;
 
     @Inject
-
     public PhysicalCardsResource(ValidatePhysicalCardUseCase validatePhysicalCardUseCase,
                                  ReissuePhysicalCardUseCase reissuePhysicalCardUseCase) {
         this.validatePhysicalCardUseCase = Objects.requireNonNull(validatePhysicalCardUseCase, "validatePhysicalCardUseCase");

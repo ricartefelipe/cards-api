@@ -15,6 +15,10 @@ public enum DeliveryStatus {
             throw new IllegalArgumentException("deliveryStatus is required");
         }
         String normalized = value.trim().toUpperCase(Locale.ROOT);
-        return DeliveryStatus.valueOf(normalized);
+        try {
+            return DeliveryStatus.valueOf(normalized);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Unknown delivery status: " + value);
+        }
     }
 }

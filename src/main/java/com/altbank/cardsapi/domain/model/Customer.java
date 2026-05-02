@@ -14,6 +14,9 @@ import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import static com.altbank.cardsapi.domain.model.support.Strings.normalizeOptional;
+import static com.altbank.cardsapi.domain.model.support.Strings.requireNonBlank;
+
 @Entity
 @Table(name = "customers")
 @Access(AccessType.FIELD)
@@ -47,9 +50,9 @@ public class Customer {
 
     public Customer(String fullName, String document, String email, String phone, Address address, Clock clock) {
         this.id = UUID.randomUUID();
-        this.fullName = require(fullName, "fullName");
-        this.document = require(document, "document");
-        this.email = require(email, "email");
+        this.fullName = requireNonBlank(fullName, "fullName");
+        this.document = requireNonBlank(document, "document");
+        this.email = requireNonBlank(email, "email");
         this.phone = normalizeOptional(phone);
         this.address = Objects.requireNonNull(address, "address");
         this.createdAt = LocalDateTime.now(Objects.requireNonNull(clock, "clock"));
@@ -81,21 +84,6 @@ public class Customer {
 
     public LocalDateTime createdAt() {
         return createdAt;
-    }
-
-    private static String normalizeOptional(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private static String require(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " is required");
-        }
-        return value.trim();
     }
 
     @Override

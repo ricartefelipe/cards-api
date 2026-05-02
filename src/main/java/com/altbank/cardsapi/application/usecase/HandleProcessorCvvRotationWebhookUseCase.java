@@ -23,7 +23,6 @@ public class HandleProcessorCvvRotationWebhookUseCase {
     private final Clock clock;
 
     @Inject
-
     public HandleProcessorCvvRotationWebhookUseCase(VirtualCardRepository virtualCardRepository, ProcessorPort processorPort, Clock clock) {
         this.virtualCardRepository = Objects.requireNonNull(virtualCardRepository, "virtualCardRepository");
         this.processorPort = Objects.requireNonNull(processorPort, "processorPort");

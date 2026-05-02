@@ -24,7 +24,6 @@ public class InMemoryProcessorSimulator implements ProcessorPort {
     private final Map<String, Entry> cvvStore = new ConcurrentHashMap<>();
 
     @Inject
-
     public InMemoryProcessorSimulator(@ConfigProperty(name = "cards.processor.cvv.default-ttl-seconds") long defaultTtlSeconds,
                                       Clock clock) {
         this.defaultTtlSeconds = defaultTtlSeconds;

@@ -13,6 +13,9 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
+import static com.altbank.cardsapi.domain.model.support.Strings.normalizeOptional;
+import static com.altbank.cardsapi.domain.model.support.Strings.requireNonBlank;
+
 @Entity
 @Table(name = "physical_cards")
 @DiscriminatorValue("PHYSICAL")
@@ -60,7 +63,7 @@ public class PhysicalCard extends Card {
                         PhysicalCard previousCard,
                         Clock clock) {
         super(account, clock);
-        this.trackingId = require(trackingId, "trackingId");
+        this.trackingId = requireNonBlank(trackingId, "trackingId");
         this.deliveryStatus = Objects.requireNonNull(initialStatus, "initialStatus");
         this.deliveryAddress = normalizeOptional(deliveryAddressSnapshot);
         this.reissueReason = reissueReason;
@@ -103,6 +106,11 @@ public class PhysicalCard extends Card {
         return previousPhysicalCardId;
     }
 
+    @Override
+    public CardType type() {
+        return CardType.PHYSICAL;
+    }
+
     public boolean isDelivered() {
         return deliveredAt != null;
     }
@@ -138,18 +146,4 @@ public class PhysicalCard extends Card {
         validatedAt = LocalDateTime.now(Objects.requireNonNull(clock, "clock"));
     }
 
-    private static String normalizeOptional(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private static String require(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " is required");
-        }
-        return value.trim();
-    }
 }

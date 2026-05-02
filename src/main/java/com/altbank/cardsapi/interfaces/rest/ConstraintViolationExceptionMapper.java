@@ -20,7 +20,6 @@ public class ConstraintViolationExceptionMapper implements ExceptionMapper<Const
     private final Clock clock;
 
     @Inject
-
     public ConstraintViolationExceptionMapper(Clock clock) {
         this.clock = Objects.requireNonNull(clock, "clock");
     }

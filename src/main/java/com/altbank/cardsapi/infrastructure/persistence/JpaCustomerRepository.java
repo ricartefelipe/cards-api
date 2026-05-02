@@ -14,7 +14,6 @@ public class JpaCustomerRepository implements CustomerRepository {
     private final EntityManager entityManager;
 
     @Inject
-
     public JpaCustomerRepository(EntityManager entityManager) {
         this.entityManager = Objects.requireNonNull(entityManager, "entityManager");
     }

@@ -13,7 +13,6 @@ import com.altbank.cardsapi.domain.model.Account;
 import com.altbank.cardsapi.domain.model.Address;
 import com.altbank.cardsapi.domain.model.Customer;
 import com.altbank.cardsapi.domain.model.PhysicalCard;
-import com.altbank.cardsapi.domain.model.ReissueReason;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import java.time.Clock;
@@ -29,7 +28,6 @@ public class CreateAccountUseCase {
     private final Clock clock;
 
     @Inject
-
     public CreateAccountUseCase(CustomerRepository customerRepository,
                                 AccountRepository accountRepository,
                                 PhysicalCardRepository physicalCardRepository,

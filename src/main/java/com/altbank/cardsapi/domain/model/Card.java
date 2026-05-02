@@ -90,15 +90,7 @@ public abstract class Card {
         deactivatedAt = LocalDateTime.now(Objects.requireNonNull(clock, "clock"));
     }
 
-    public CardType type() {
-        if (this instanceof PhysicalCard) {
-            return CardType.PHYSICAL;
-        }
-        if (this instanceof VirtualCard) {
-            return CardType.VIRTUAL;
-        }
-        throw new IllegalStateException("Unknown card type");
-    }
+    public abstract CardType type();
 
     @Override
     public boolean equals(Object o) {

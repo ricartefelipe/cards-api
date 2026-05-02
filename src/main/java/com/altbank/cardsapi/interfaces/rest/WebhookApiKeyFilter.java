@@ -10,6 +10,8 @@ import jakarta.ws.rs.container.ContainerRequestFilter;
 import jakarta.ws.rs.ext.Provider;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Objects;
 
 @Provider
@@ -22,7 +24,6 @@ public class WebhookApiKeyFilter implements ContainerRequestFilter {
     private final String processorApiKey;
 
     @Inject
-
     public WebhookApiKeyFilter(@ConfigProperty(name = "cards.webhooks.carrier.api-key") String carrierApiKey,
                                @ConfigProperty(name = "cards.webhooks.processor.api-key") String processorApiKey) {
         this.carrierApiKey = Objects.requireNonNull(carrierApiKey, "carrierApiKey");
@@ -44,8 +45,14 @@ public class WebhookApiKeyFilter implements ContainerRequestFilter {
 
     private void validateKey(ContainerRequestContext requestContext, String expected) {
         String provided = requestContext.getHeaderString(HEADER_NAME);
-        if (provided == null || !provided.equals(expected)) {
+        if (provided == null || !timingSafeEquals(provided, expected)) {
             throw new UnauthorizedException(ErrorCode.WEBHOOK_UNAUTHORIZED, "Invalid webhook API key");
         }
+    }
+
+    private static boolean timingSafeEquals(String a, String b) {
+        byte[] aBytes = a.getBytes(StandardCharsets.UTF_8);
+        byte[] bBytes = b.getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(aBytes, bBytes);
     }
 }

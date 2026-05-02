@@ -21,7 +21,6 @@ public class HandleCarrierDeliveryWebhookUseCase {
     private final Clock clock;
 
     @Inject
-
     public HandleCarrierDeliveryWebhookUseCase(PhysicalCardRepository physicalCardRepository, Clock clock) {
         this.physicalCardRepository = Objects.requireNonNull(physicalCardRepository, "physicalCardRepository");
         this.clock = Objects.requireNonNull(clock, "clock");

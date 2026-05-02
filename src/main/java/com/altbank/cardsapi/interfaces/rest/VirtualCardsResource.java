@@ -29,7 +29,6 @@ public class VirtualCardsResource {
     private final ReissueVirtualCardUseCase reissueVirtualCardUseCase;
 
     @Inject
-
     public VirtualCardsResource(GetVirtualCardCvvUseCase getVirtualCardCvvUseCase,
                                 ReissueVirtualCardUseCase reissueVirtualCardUseCase) {
         this.getVirtualCardCvvUseCase = Objects.requireNonNull(getVirtualCardCvvUseCase, "getVirtualCardCvvUseCase");

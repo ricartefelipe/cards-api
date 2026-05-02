@@ -25,7 +25,6 @@ public class ReissuePhysicalCardUseCase {
     private final Clock clock;
 
     @Inject
-
     public ReissuePhysicalCardUseCase(PhysicalCardRepository physicalCardRepository, CarrierPort carrierPort, Clock clock) {
         this.physicalCardRepository = Objects.requireNonNull(physicalCardRepository, "physicalCardRepository");
         this.carrierPort = Objects.requireNonNull(carrierPort, "carrierPort");
