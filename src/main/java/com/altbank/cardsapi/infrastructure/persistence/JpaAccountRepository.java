@@ -15,7 +15,6 @@ public class JpaAccountRepository implements AccountRepository {
     private final EntityManager entityManager;
 
     @Inject
-
     public JpaAccountRepository(EntityManager entityManager) {
         this.entityManager = Objects.requireNonNull(entityManager, "entityManager");
     }

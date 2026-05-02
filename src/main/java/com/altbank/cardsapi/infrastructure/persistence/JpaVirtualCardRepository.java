@@ -16,7 +16,6 @@ public class JpaVirtualCardRepository implements VirtualCardRepository {
     private final EntityManager entityManager;
 
     @Inject
-
     public JpaVirtualCardRepository(EntityManager entityManager) {
         this.entityManager = Objects.requireNonNull(entityManager, "entityManager");
     }

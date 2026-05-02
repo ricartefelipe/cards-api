@@ -29,7 +29,6 @@ public class IssueVirtualCardUseCase {
     private final Clock clock;
 
     @Inject
-
     public IssueVirtualCardUseCase(AccountRepository accountRepository,
                                    PhysicalCardRepository physicalCardRepository,
                                    VirtualCardRepository virtualCardRepository,

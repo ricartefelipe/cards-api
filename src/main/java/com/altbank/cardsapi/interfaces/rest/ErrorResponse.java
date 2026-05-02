@@ -1,6 +1,5 @@
 package com.altbank.cardsapi.interfaces.rest;
 
-import jakarta.inject.Inject;
 import java.time.LocalDateTime;
 import java.util.List;
 

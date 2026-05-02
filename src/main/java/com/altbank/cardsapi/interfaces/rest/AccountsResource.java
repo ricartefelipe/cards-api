@@ -34,7 +34,6 @@ public class AccountsResource {
     private final CancelAccountUseCase cancelAccountUseCase;
 
     @Inject
-
     public AccountsResource(CreateAccountUseCase createAccountUseCase,
                             IssueVirtualCardUseCase issueVirtualCardUseCase,
                             CancelAccountUseCase cancelAccountUseCase) {

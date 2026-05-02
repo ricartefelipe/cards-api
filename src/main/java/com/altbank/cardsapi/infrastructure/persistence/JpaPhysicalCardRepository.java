@@ -16,7 +16,6 @@ public class JpaPhysicalCardRepository implements PhysicalCardRepository {
     private final EntityManager entityManager;
 
     @Inject
-
     public JpaPhysicalCardRepository(EntityManager entityManager) {
         this.entityManager = Objects.requireNonNull(entityManager, "entityManager");
     }

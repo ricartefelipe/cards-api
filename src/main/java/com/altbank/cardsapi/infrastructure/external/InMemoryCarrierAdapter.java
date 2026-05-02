@@ -1,6 +1,5 @@
 package com.altbank.cardsapi.infrastructure.external;
 
-import jakarta.inject.Inject;
 import com.altbank.cardsapi.application.port.CarrierPort;
 import com.altbank.cardsapi.domain.model.DeliveryStatus;
 import jakarta.enterprise.context.ApplicationScoped;

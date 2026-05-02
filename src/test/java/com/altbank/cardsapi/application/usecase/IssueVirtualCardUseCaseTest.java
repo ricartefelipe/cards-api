@@ -60,7 +60,6 @@ class IssueVirtualCardUseCaseTest {
 
         when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
         when(physicalCardRepository.findActiveByAccountId(accountId)).thenReturn(Optional.of(physicalCard));
-        when(virtualCardRepository.findActiveByAccountId(accountId)).thenReturn(Optional.empty());
 
         IssueVirtualCardUseCase useCase = new IssueVirtualCardUseCase(
                 accountRepository,
@@ -73,6 +72,7 @@ class IssueVirtualCardUseCaseTest {
         ConflictException ex = Assertions.assertThrows(ConflictException.class, () -> useCase.issue(accountId));
         Assertions.assertEquals(ErrorCode.PHYSICAL_CARD_NOT_DELIVERED, ex.errorCode());
         verifyNoInteractions(processorPort);
+        verify(virtualCardRepository, never()).findActiveByAccountId(any());
         verify(virtualCardRepository, never()).persist(any(VirtualCard.class));
     }
 

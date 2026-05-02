@@ -24,7 +24,6 @@ public class ReissueVirtualCardUseCase {
     private final Clock clock;
 
     @Inject
-
     public ReissueVirtualCardUseCase(VirtualCardRepository virtualCardRepository, ProcessorPort processorPort, Clock clock) {
         this.virtualCardRepository = Objects.requireNonNull(virtualCardRepository, "virtualCardRepository");
         this.processorPort = Objects.requireNonNull(processorPort, "processorPort");

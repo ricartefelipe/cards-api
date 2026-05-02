@@ -22,7 +22,6 @@ public class ValidatePhysicalCardUseCase {
     private final Clock clock;
 
     @Inject
-
     public ValidatePhysicalCardUseCase(PhysicalCardRepository physicalCardRepository, Clock clock) {
         this.physicalCardRepository = Objects.requireNonNull(physicalCardRepository, "physicalCardRepository");
         this.clock = Objects.requireNonNull(clock, "clock");
