@@ -66,9 +66,18 @@ export CVV_DEFAULT_TTL_SECONDS=900
 mvn quarkus:dev
 ```
 
-Em modo dev, o **Dev Services** inicia automaticamente um Keycloak e importa o realm `quarkus` com usuários pré-configurados.
-
 Flyway aplica as migrations automaticamente no startup.
+
+Em modo dev, por omissão podem correr **Dev Services** (por exemplo Keycloak com o realm `quarkus`); se optar por infraestrutura apenas via **Docker Compose**, veja a secção seguinte para evitar sobreposição nas portas **3306** e **8180**.
+
+### Docker Compose versus Dev Services
+
+- O Compose deste repositório usa usualmente **MariaDB na porta 3306** e **Keycloak na 8180** (`docker compose up -d`).
+- Com **`mvn quarkus:dev`**, o Quarkus pode iniciar **contentores próprios** (Dev Services) para base de dados e OIDC, consoante as extensões e se já há algo à escuta nas portas envolvidas.
+- Para **evitar duplicar serviços ou falhas por porta em uso**:
+  - Se quiser usar **só** o MariaDB e o Keycloak do **Compose**, desative no perfil `dev` os Dev Services que repetem o mesmo papel, por exemplo `quarkus.datasource.devservices.enabled=false` e `quarkus.keycloak.devservices.enabled=false`.
+  - Alinhe o **OIDC** ao Keycloak que está a usar (URL do realm). Neste repo, `quarkus.oidc.auth-server-url` está sob o perfil **`%prod`**; em dev o fluxo típico passa pelo Keycloak dos Dev Services ou por configuração extra local (`KEYCLOAK_URL`, ficheiros de perfil ignorados pelo Git, etc.).
+- Na prática: **não combine** dois Keycloaks ou duas bases a disputar **a mesma porta** (3306, 8180) sem configurar uma das partes explicitamente para outra porta ou para ficar desligada.
 
 OpenAPI:
 - http://localhost:8080/openapi
