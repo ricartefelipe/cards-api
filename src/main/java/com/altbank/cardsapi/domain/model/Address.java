@@ -6,6 +6,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import java.util.Objects;
 
+import static com.altbank.cardsapi.domain.model.support.Strings.requireNonBlank;
+
 @Embeddable
 @Access(AccessType.FIELD)
 public class Address {
@@ -32,12 +34,12 @@ public class Address {
     }
 
     public Address(String street, String number, String city, String state, String zipCode, String country) {
-        this.street = require(street, "street");
-        this.number = require(number, "number");
-        this.city = require(city, "city");
-        this.state = require(state, "state");
-        this.zipCode = require(zipCode, "zipCode");
-        this.country = require(country, "country");
+        this.street = requireNonBlank(street, "street");
+        this.number = requireNonBlank(number, "number");
+        this.city = requireNonBlank(city, "city");
+        this.state = requireNonBlank(state, "state");
+        this.zipCode = requireNonBlank(zipCode, "zipCode");
+        this.country = requireNonBlank(country, "country");
     }
 
     public String street() {
@@ -66,13 +68,6 @@ public class Address {
 
     public String asSingleLine() {
         return street + ", " + number + ", " + city + "-" + state + ", " + zipCode + ", " + country;
-    }
-
-    private static String require(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " is required");
-        }
-        return value;
     }
 
     @Override

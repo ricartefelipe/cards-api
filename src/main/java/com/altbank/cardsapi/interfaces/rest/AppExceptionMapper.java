@@ -18,7 +18,6 @@ public class AppExceptionMapper implements ExceptionMapper<AppException> {
     private final Clock clock;
 
     @Inject
-
     public AppExceptionMapper(Clock clock) {
         this.clock = Objects.requireNonNull(clock, "clock");
     }

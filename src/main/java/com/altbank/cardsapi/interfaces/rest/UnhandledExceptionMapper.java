@@ -10,14 +10,16 @@ import jakarta.ws.rs.ext.Provider;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
+import org.jboss.logging.Logger;
 
 @Provider
 public class UnhandledExceptionMapper implements ExceptionMapper<Exception> {
 
+    private static final Logger LOG = Logger.getLogger(UnhandledExceptionMapper.class);
+
     private final Clock clock;
 
     @Inject
-
     public UnhandledExceptionMapper(Clock clock) {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -27,6 +29,7 @@ public class UnhandledExceptionMapper implements ExceptionMapper<Exception> {
 
     @Override
     public Response toResponse(Exception exception) {
+        LOG.error("Unhandled exception", exception);
         String path = uriInfo == null ? null : uriInfo.getPath();
         ErrorResponse body = new ErrorResponse(
                 "INTERNAL_ERROR",

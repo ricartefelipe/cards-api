@@ -27,7 +27,6 @@ public class CancelAccountUseCase {
     private final Clock clock;
 
     @Inject
-
     public CancelAccountUseCase(AccountRepository accountRepository,
                                PhysicalCardRepository physicalCardRepository,
                                VirtualCardRepository virtualCardRepository,

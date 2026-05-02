@@ -12,6 +12,8 @@ import jakarta.persistence.Table;
 import java.time.Clock;
 import java.time.LocalDateTime;
 
+import static com.altbank.cardsapi.domain.model.support.Strings.requireNonBlank;
+
 @Entity
 @Table(name = "virtual_cards")
 @DiscriminatorValue("VIRTUAL")
@@ -54,8 +56,8 @@ public class VirtualCard extends Card {
                        VirtualCard previousCard,
                        Clock clock) {
         super(account, clock);
-        this.processorAccountId = require(processorAccountId, "processorAccountId");
-        this.processorCardId = require(processorCardId, "processorCardId");
+        this.processorAccountId = requireNonBlank(processorAccountId, "processorAccountId");
+        this.processorCardId = requireNonBlank(processorCardId, "processorCardId");
         this.cvvExpirationAt = cvvExpirationAt;
         this.reissueReason = reissueReason;
         this.previousVirtualCardId = previousCard == null ? null : previousCard.id().toString();
@@ -83,13 +85,6 @@ public class VirtualCard extends Card {
 
     public void updateCvvExpirationAt(LocalDateTime expirationAt) {
         this.cvvExpirationAt = expirationAt;
-    }
-
-    private static String require(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " is required");
-        }
-        return value.trim();
     }
 
     @Override

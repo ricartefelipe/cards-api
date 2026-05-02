@@ -26,7 +26,6 @@ public class WebhooksResource {
     private final HandleProcessorCvvRotationWebhookUseCase handleProcessorCvvRotationWebhookUseCase;
 
     @Inject
-
     public WebhooksResource(HandleCarrierDeliveryWebhookUseCase handleCarrierDeliveryWebhookUseCase,
                             HandleProcessorCvvRotationWebhookUseCase handleProcessorCvvRotationWebhookUseCase) {
         this.handleCarrierDeliveryWebhookUseCase = Objects.requireNonNull(handleCarrierDeliveryWebhookUseCase, "handleCarrierDeliveryWebhookUseCase");
