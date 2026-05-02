@@ -1,5 +1,42 @@
-/target
-/.idea
-/.vscode
+### Build — Maven / Quarkus
+target/
+**/target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+### Logs e temporários
+*.log
+*.tmp
+*.temp
+*.swp
+*~
+
+### Ambiente e segredos locais
+.env
+.env.*
+!.env.example
+
+### IDEs e editores
+.idea/
 *.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.factorypath
+.vscode/
+*.code-workspace
+
+### Sistema operativo
 .DS_Store
+Thumbs.db
+
+### Quarkus / GraalVM (compilação nativa local)
+*.native-image
