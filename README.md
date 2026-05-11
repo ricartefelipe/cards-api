@@ -17,6 +17,8 @@ API REST (Quarkus) para gestão de Conta, Cliente e Cartões (físico e virtual)
 
 ## Subindo dependências
 
+> **Atenção:** As credenciais abaixo são exemplos para ambiente local. Configure valores seguros via variáveis de ambiente em qualquer outro ambiente.
+
 ```bash
 docker compose up -d
 ```
@@ -26,12 +28,12 @@ Banco local (MariaDB no compose — serviço `mysql`; driver JDBC padrão `jdbc:
 - porta: 3306
 - database: cards_api
 - user: cards
-- password: cards
-- root password: root
+- password: <DB_PASSWORD>
+- root password: <DB_ROOT_PASSWORD>
 
 Keycloak (docker-compose, opcional em dev):
 - URL: http://localhost:8180
-- Admin: admin/admin
+- Admin: <KEYCLOAK_ADMIN>/<KEYCLOAK_ADMIN_PASSWORD>
 - Realm `quarkus` importado automaticamente com client `backend-service` e usuários alice, admin
 
 ## Configuração
@@ -39,8 +41,8 @@ Keycloak (docker-compose, opcional em dev):
 As configurações abaixo possuem default para ambiente local.
 
 ```bash
-export CARRIER_WEBHOOK_API_KEY=carrier-local-key
-export PROCESSOR_WEBHOOK_API_KEY=processor-local-key
+export CARRIER_WEBHOOK_API_KEY=<CARRIER_WEBHOOK_API_KEY>
+export PROCESSOR_WEBHOOK_API_KEY=<PROCESSOR_WEBHOOK_API_KEY>
 ```
 
 OAuth2/Keycloak (produção):
@@ -48,15 +50,15 @@ OAuth2/Keycloak (produção):
 ```bash
 export KEYCLOAK_URL=http://localhost:8180
 export KEYCLOAK_REALM=quarkus
-export KEYCLOAK_CLIENT_SECRET=secret
+export KEYCLOAK_CLIENT_SECRET=<KEYCLOAK_CLIENT_SECRET>
 ```
 
 Opcional:
 
 ```bash
 export DB_JDBC_URL="jdbc:mariadb://localhost:3306/cards_api?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
-export DB_USERNAME=cards
-export DB_PASSWORD=cards
+export DB_USERNAME=<DB_USERNAME>
+export DB_PASSWORD=<DB_PASSWORD>
 export CVV_DEFAULT_TTL_SECONDS=900
 ```
 
@@ -100,11 +102,11 @@ Os endpoints `/accounts`, `/physical-cards` e `/virtual-cards` exigem Bearer tok
 ```bash
 export ACCESS_TOKEN=$(curl -s -X POST "http://localhost:8180/realms/quarkus/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -u "backend-service:secret" \
-  -d "username=alice&password=alice&grant_type=password" | jq -r '.access_token')
+  -u "<KEYCLOAK_CLIENT_ID>:<KEYCLOAK_CLIENT_SECRET>" \
+  -d "username=<USERNAME>&password=<PASSWORD>&grant_type=password" | jq -r '.access_token')
 ```
 
-Usuários de exemplo: `alice`/`alice` (role user), `admin`/`admin` (roles user, admin).
+Usuários de exemplo: ver realm Keycloak importado (roles: user, admin).
 
 ### Chamadas autenticadas
 
