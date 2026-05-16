@@ -17,7 +17,15 @@ API REST (Quarkus) para gestão de Conta, Cliente e Cartões (físico e virtual)
 
 ## Subindo dependências
 
-> **Atenção:** As credenciais abaixo são exemplos para ambiente local. Configure valores seguros via variáveis de ambiente em qualquer outro ambiente.
+> **Credenciais:** Nunca comite `.env`. Gere valores fortes antes do primeiro uso (por exemplo `openssl rand -hex 24`). Para `KEYCLOAK_CLIENT_SECRET`, deve coincidir com o segredo configurado para o client `backend-service` no ficheiro `src/main/resources/quarkus-realm.json` importado pelo Keycloak ao subir via Compose (`docker compose`/Keycloak aceita também rotações feitas só no servidor). Quem alterar passwords ou segredos deve regenerar também o realm conforme política da equipa ou via consola do Keycloak. Valores já expostos em repositório ou histórico devem considerar-se inválidos: substitua todos nos ambientes reais independentemente das alterações feitas ao código-fonte.
+
+Antes do primeiro `docker compose up`, crie `.env` na raiz (este ficheiro está no `.gitignore`):
+
+```bash
+cp .env.example .env
+```
+
+Consulte `.env.example` para os nomes obrigatórios; preencha cada variável antes de iniciar Compose ou Quarkus (`mvn quarkus:dev` também lê `.env`).
 
 ```bash
 docker compose up -d
@@ -27,37 +35,61 @@ Banco local (MariaDB no compose — serviço `mysql`; driver JDBC padrão `jdbc:
 - host: localhost
 - porta: 3306
 - database: cards_api
-- user: cards
-- password: <DB_PASSWORD>
-- root password: <DB_ROOT_PASSWORD>
+- user: `cards` (ou `MARIADB_USER` no `.env`)
+- password: o valor de `MARIADB_PASSWORD` / `DB_PASSWORD` no `.env`
+- root password: `MARIADB_ROOT_PASSWORD` no `.env`
 
 Keycloak (docker-compose, opcional em dev):
 - URL: http://localhost:8180
-- Admin: <KEYCLOAK_ADMIN>/<KEYCLOAK_ADMIN_PASSWORD>
-- Realm `quarkus` importado automaticamente com client `backend-service` e usuários alice, admin
+- Conta de **administração do servidor** (KC bootstrap): defina apenas no `.env`, com credenciais fortes próprias.
+- Realm `quarkus` é importado a partir de `src/main/resources/quarkus-realm.json`, incluindo o client confidencial `backend-service`; o seu `.env` deve usar o mesmo `KEYCLOAK_CLIENT_SECRET` (`KEYCLOAK_CLIENT_SECRET` igual ao campo `secret` desse client no JSON). Utilizadores de realm existentes servem apenas para desenvolvimento: altere sempre as passwords antes de usar fora da sua máquina (consola ou novo export/regeneração dos hashes).
+
+Para obter o segredo atual do client `backend-service` no repositório (por exemplo antes de gravar `.env`), pode usar:
+
+```bash
+python3 - <<'PY'
+import json
+from pathlib import Path
+realm = Path("src/main/resources/quarkus-realm.json")
+with realm.open(encoding="utf-8") as f:
+    doc = json.load(f)
+secret = next(
+    (c["secret"] for c in doc.get("clients", []) if c.get("clientId") == "backend-service"),
+    None,
+)
+assert secret is not None, "realm sem client backend-service"
+print(secret)
+PY
+```
 
 ## Configuração
 
-As configurações abaixo possuem default para ambiente local.
+A aplicação **não** usa senhas ou API keys fictícias por omissão em `application.properties`. Carregue um ficheiro `.env` na raiz (o Quarkus lê-o em dev) ou exporte manualmente os mesmos nomes antes de arrancar.
 
 ```bash
-export CARRIER_WEBHOOK_API_KEY=<CARRIER_WEBHOOK_API_KEY>
-export PROCESSOR_WEBHOOK_API_KEY=<PROCESSOR_WEBHOOK_API_KEY>
+# Alternativa ao .env na raiz (equivale aos campos relevantes em .env.example)
+export DB_PASSWORD=<valor>
+export CARRIER_WEBHOOK_API_KEY=<valor>
+export PROCESSOR_WEBHOOK_API_KEY=<valor>
+export KEYCLOAK_CLIENT_SECRET=<valor>
 ```
 
-OAuth2/Keycloak (produção):
+OAuth2 / Keycloak:
+
+- Em **desenvolvimento** (`quarkus:dev`), por omissão: `KEYCLOAK_URL` pode ser omitido desde que utilize `http://localhost:8180` (ver `%dev.quarkus.oidc.auth-server-url`).
+- Em **produção** (`-Dquarkus.profile=prod`): `KEYCLOAK_URL` e `KEYCLOAK_CLIENT_SECRET` são obrigatórios.
 
 ```bash
-export KEYCLOAK_URL=http://localhost:8180
+export KEYCLOAK_URL=http://localhost:8180   # exemplo; em prod use a URL real do IAM
 export KEYCLOAK_REALM=quarkus
 export KEYCLOAK_CLIENT_SECRET=<KEYCLOAK_CLIENT_SECRET>
 ```
 
-Opcional:
+Outras JDBC / TTL:
 
 ```bash
 export DB_JDBC_URL="jdbc:mariadb://localhost:3306/cards_api?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
-export DB_USERNAME=<DB_USERNAME>
+export DB_USERNAME=cards
 export DB_PASSWORD=<DB_PASSWORD>
 export CVV_DEFAULT_TTL_SECONDS=900
 ```
@@ -78,7 +110,7 @@ Em modo dev, por omissão podem correr **Dev Services** (por exemplo Keycloak co
 - Com **`mvn quarkus:dev`**, o Quarkus pode iniciar **contentores próprios** (Dev Services) para base de dados e OIDC, consoante as extensões e se já há algo à escuta nas portas envolvidas.
 - Para **evitar duplicar serviços ou falhas por porta em uso**:
   - Se quiser usar **só** o MariaDB e o Keycloak do **Compose**, desative no perfil `dev` os Dev Services que repetem o mesmo papel, por exemplo `quarkus.datasource.devservices.enabled=false` e `quarkus.keycloak.devservices.enabled=false`.
-  - Alinhe o **OIDC** ao Keycloak que está a usar (URL do realm). Neste repo, `quarkus.oidc.auth-server-url` está sob o perfil **`%prod`**; em dev o fluxo típico passa pelo Keycloak dos Dev Services ou por configuração extra local (`KEYCLOAK_URL`, ficheiros de perfil ignorados pelo Git, etc.).
+  - Alinhe o **OIDC** ao Keycloak que está a usar (URL do realm). Em **dev** o URL padrão é `http://localhost:8180` (ver `application.properties`); em **produção** `KEYCLOAK_URL` tem de ser definido explicitamente.
 - Na prática: **não combine** dois Keycloaks ou duas bases a disputar **a mesma porta** (3306, 8180) sem configurar uma das partes explicitamente para outra porta ou para ficar desligada.
 
 OpenAPI:
@@ -102,11 +134,11 @@ Os endpoints `/accounts`, `/physical-cards` e `/virtual-cards` exigem Bearer tok
 ```bash
 export ACCESS_TOKEN=$(curl -s -X POST "http://localhost:8180/realms/quarkus/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -u "<KEYCLOAK_CLIENT_ID>:<KEYCLOAK_CLIENT_SECRET>" \
-  -d "username=<USERNAME>&password=<PASSWORD>&grant_type=password" | jq -r '.access_token')
+  -u "backend-service:${KEYCLOAK_CLIENT_SECRET}" \
+  -d "username=alice&password=${ALICE_PASSWORD}&grant_type=password" | jq -r '.access_token')
 ```
 
-Usuários de exemplo: ver realm Keycloak importado (roles: user, admin).
+Defina `KEYCLOAK_CLIENT_SECRET` conforme `.env`; `ALICE_PASSWORD` deve ser uma password válida configurada para o utilizador `alice` no Keycloak utilizado pela sua cópia do realm ou equivalente atualizado.
 
 ### Chamadas autenticadas
 
