@@ -1,0 +1,12 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Health da API Quarkus. Keycloak + MariaDB não entram neste serviço único —
+# no Railway é preciso provisionar IAM/DB à parte (ou projeto multi-serviço).
+# Stack local completa (API + MariaDB + Keycloak): ./scripts/portfolio-up.sh
+healthcheckPath = "/q/health/ready"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
