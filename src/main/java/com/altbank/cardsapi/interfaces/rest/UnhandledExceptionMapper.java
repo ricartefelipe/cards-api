@@ -29,8 +29,22 @@ public class UnhandledExceptionMapper implements ExceptionMapper<Exception> {
 
     @Override
     public Response toResponse(Exception exception) {
-        LOG.error("Unhandled exception", exception);
         String path = uriInfo == null ? null : uriInfo.getPath();
+        if (exception instanceof jakarta.ws.rs.NotFoundException) {
+            ErrorResponse body = new ErrorResponse(
+                    "NOT_FOUND",
+                    "Resource not found",
+                    404,
+                    path,
+                    LocalDateTime.now(clock),
+                    null
+            );
+            return Response.status(404)
+                    .type(MediaType.APPLICATION_JSON)
+                    .entity(body)
+                    .build();
+        }
+        LOG.error("Unhandled exception", exception);
         ErrorResponse body = new ErrorResponse(
                 "INTERNAL_ERROR",
                 "Unexpected error",
