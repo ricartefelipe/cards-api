@@ -1,3 +1,4 @@
+import { loginTotalRecall } from '../totalrecall'
 import type {
   AccountDetail,
   AccountSummary,
@@ -52,7 +53,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export async function loginWithPassword(username: string, password: string): Promise<string> {
+async function keycloakPasswordGrant(username: string, password: string): Promise<string | null> {
   const body = new URLSearchParams({
     grant_type: 'password',
     client_id: 'cards-admin',
@@ -64,11 +65,25 @@ export async function loginWithPassword(username: string, password: string): Pro
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
   })
-  if (!res.ok) {
+  if (!res.ok) return null
+  const data = (await res.json()) as { access_token?: string }
+  return data.access_token ?? null
+}
+
+export async function loginWithPassword(username: string, password: string): Promise<string> {
+  const tr = await loginTotalRecall(username, password, 'cards-api')
+  if (tr?.valid) {
+    const demoUser = (import.meta.env.VITE_DEMO_KC_USER as string | undefined) || 'alice'
+    const demoPass = (import.meta.env.VITE_DEMO_KC_PASSWORD as string | undefined) || 'alice'
+    const demoToken = await keycloakPasswordGrant(demoUser, demoPass)
+    if (demoToken) return demoToken
+  }
+
+  const token = await keycloakPasswordGrant(username, password)
+  if (!token) {
     throw new Error('Credenciais inválidas ou Keycloak indisponível.')
   }
-  const data = (await res.json()) as { access_token: string }
-  return data.access_token
+  return token
 }
 
 export const api = {
