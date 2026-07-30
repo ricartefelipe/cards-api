@@ -1,7 +1,5 @@
 # Cards Desk Admin Implementation Plan
 
-> **For agentic workers:** Execute task-by-task in this repo. Steps use checkbox syntax.
-
 **Goal:** Extender Cards API com GET/list e publicar admin Vite “Cards Desk” na porta 9085 com Keycloak.
 
 **Architecture:** Quarkus query use-cases + resources; Vite/React SPA com password grant; nginx serve + proxy `/api` e `/auth`.
@@ -11,7 +9,7 @@
 ## Global Constraints
 
 - GitFlow: `feature/*` → `develop` → `release/*` → `master`
-- Sem menções a IA/Cursor em commits, PRs ou código versionado
+- Sem trailers ou menções a ferramentas de autoria em commits, PRs ou código versionado
 - CVV nunca em list/detail; só endpoint dedicado
 - Visual Ledger Steel (Syne + Figtree; não roxo/cream/verde AssinaFlow)
 - Porta admin: 9085
