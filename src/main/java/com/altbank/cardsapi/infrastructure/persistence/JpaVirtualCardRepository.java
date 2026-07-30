@@ -6,6 +6,7 @@ import com.altbank.cardsapi.domain.model.CardStatus;
 import com.altbank.cardsapi.domain.model.VirtualCard;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,6 +45,25 @@ public class JpaVirtualCardRepository implements VirtualCardRepository {
                 .setParameter("processorCardId", processorCardId)
                 .getResultStream()
                 .findFirst();
+    }
+
+    @Override
+    public List<VirtualCard> listAll() {
+        return entityManager.createQuery(
+                        "SELECT v FROM VirtualCard v JOIN FETCH v.account ORDER BY v.createdAt DESC",
+                        VirtualCard.class
+                )
+                .getResultList();
+    }
+
+    @Override
+    public List<VirtualCard> listByAccountId(UUID accountId) {
+        return entityManager.createQuery(
+                        "SELECT v FROM VirtualCard v JOIN FETCH v.account WHERE v.account.id = :accountId ORDER BY v.createdAt DESC",
+                        VirtualCard.class
+                )
+                .setParameter("accountId", accountId)
+                .getResultList();
     }
 
     @Override

@@ -6,6 +6,7 @@ import com.altbank.cardsapi.domain.model.CardStatus;
 import com.altbank.cardsapi.domain.model.PhysicalCard;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,6 +45,25 @@ public class JpaPhysicalCardRepository implements PhysicalCardRepository {
                 .setMaxResults(1)
                 .getResultStream()
                 .findFirst();
+    }
+
+    @Override
+    public List<PhysicalCard> listAll() {
+        return entityManager.createQuery(
+                        "SELECT p FROM PhysicalCard p JOIN FETCH p.account ORDER BY p.createdAt DESC",
+                        PhysicalCard.class
+                )
+                .getResultList();
+    }
+
+    @Override
+    public List<PhysicalCard> listByAccountId(UUID accountId) {
+        return entityManager.createQuery(
+                        "SELECT p FROM PhysicalCard p JOIN FETCH p.account WHERE p.account.id = :accountId ORDER BY p.createdAt DESC",
+                        PhysicalCard.class
+                )
+                .setParameter("accountId", accountId)
+                .getResultList();
     }
 
     @Override

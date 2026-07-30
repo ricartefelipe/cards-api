@@ -5,8 +5,10 @@ import com.altbank.cardsapi.application.port.CustomerRepository;
 import com.altbank.cardsapi.domain.model.Customer;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 @ApplicationScoped
 public class JpaCustomerRepository implements CustomerRepository {
@@ -24,6 +26,20 @@ public class JpaCustomerRepository implements CustomerRepository {
                 .setParameter("document", document)
                 .getResultStream()
                 .findFirst();
+    }
+
+    @Override
+    public Optional<Customer> findById(UUID customerId) {
+        return Optional.ofNullable(entityManager.find(Customer.class, customerId));
+    }
+
+    @Override
+    public List<Customer> listAll() {
+        return entityManager.createQuery(
+                        "SELECT c FROM Customer c ORDER BY c.createdAt DESC",
+                        Customer.class
+                )
+                .getResultList();
     }
 
     @Override

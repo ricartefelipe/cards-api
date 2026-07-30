@@ -5,6 +5,7 @@ import com.altbank.cardsapi.application.port.AccountRepository;
 import com.altbank.cardsapi.domain.model.Account;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,6 +31,15 @@ public class JpaAccountRepository implements AccountRepository {
                 .setParameter("customerId", customerId)
                 .getResultStream()
                 .findFirst();
+    }
+
+    @Override
+    public List<Account> listAll() {
+        return entityManager.createQuery(
+                        "SELECT a FROM Account a JOIN FETCH a.customer ORDER BY a.createdAt DESC",
+                        Account.class
+                )
+                .getResultList();
     }
 
     @Override
