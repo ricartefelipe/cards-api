@@ -64,3 +64,13 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+
+  cards-admin:
+    build:
+      context: ./admin
+    container_name: cards-admin
+    ports:
+      - "${ADMIN_PORT:-9085}:80"
+    depends_on:
+      - cards-api
+      - keycloak

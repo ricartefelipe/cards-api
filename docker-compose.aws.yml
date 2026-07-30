@@ -1,0 +1,27 @@
+services:
+  keycloak:
+    ports: !override
+      - "8181:8080"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME: http://54.94.163.136:8181
+    volumes: !override
+      - ./src/main/resources/quarkus-realm.json:/opt/keycloak/data/import/quarkus-realm.json
+    command: start-dev --import-realm --http-enabled=true --hostname-strict=false
+
+  mysql:
+    ports: !override []
+
+  cards-api:
+    ports: !override
+      - "8083:8080"
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+
+  cards-admin:
+    ports: !override
+      - "9085:80"
