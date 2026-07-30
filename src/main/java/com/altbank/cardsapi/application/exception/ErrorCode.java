@@ -2,8 +2,10 @@ package com.altbank.cardsapi.application.exception;
 
 public enum ErrorCode {
     CUSTOMER_ALREADY_EXISTS,
+    CUSTOMER_NOT_FOUND,
     ACCOUNT_NOT_FOUND,
     CARD_NOT_FOUND,
+    PHYSICAL_CARD_NOT_FOUND,
     ACCOUNT_CANCELLED,
     CARD_INACTIVE,
     PHYSICAL_CARD_NOT_DELIVERED,
