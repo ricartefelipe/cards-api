@@ -1,4 +1,3 @@
-import { loginTotalRecall } from '../totalrecall'
 import type {
   AccountDetail,
   AccountSummary,
@@ -71,14 +70,6 @@ async function keycloakPasswordGrant(username: string, password: string): Promis
 }
 
 export async function loginWithPassword(username: string, password: string): Promise<string> {
-  const tr = await loginTotalRecall(username, password, 'cards-api')
-  if (tr?.valid) {
-    const demoUser = (import.meta.env.VITE_DEMO_KC_USER as string | undefined) || 'alice'
-    const demoPass = (import.meta.env.VITE_DEMO_KC_PASSWORD as string | undefined) || 'alice'
-    const demoToken = await keycloakPasswordGrant(demoUser, demoPass)
-    if (demoToken) return demoToken
-  }
-
   const token = await keycloakPasswordGrant(username, password)
   if (!token) {
     throw new Error('Credenciais inválidas ou Keycloak indisponível.')
