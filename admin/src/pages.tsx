@@ -89,13 +89,13 @@ export function LoginPage() {
       <section className="login-panel">
         <form className="panel" onSubmit={onSubmit}>
           <h2>Entrar</h2>
-          <p className="muted">E-mail/senha TotalRecall ou conta local do Keycloak</p>
+          <p className="muted">Conta Keycloak do desk (e-mail e senha)</p>
           <label>
             E-mail
             <input type="email" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
           </label>
           <label>
-            Senha TotalRecall
+            Senha
             <input
               type="password"
               value={password}
