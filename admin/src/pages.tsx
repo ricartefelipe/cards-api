@@ -89,13 +89,13 @@ export function LoginPage() {
       <section className="login-panel">
         <form className="panel" onSubmit={onSubmit}>
           <h2>Entrar</h2>
-          <p className="muted">Keycloak realm quarkus · demo portfolio</p>
+          <p className="muted">E-mail/senha TotalRecall ou conta local do Keycloak</p>
           <label>
-            Utilizador
-            <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
+            E-mail
+            <input type="email" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
           </label>
           <label>
-            Password
+            Senha TotalRecall
             <input
               type="password"
               value={password}
@@ -105,7 +105,7 @@ export function LoginPage() {
           </label>
           {error && <p className="error">{error}</p>}
           <button className="btn" type="submit" disabled={loading}>
-            {loading ? 'A autenticar…' : 'Aceder ao desk'}
+            {loading ? 'Entrando…' : 'Entrar no desk'}
           </button>
         </form>
       </section>

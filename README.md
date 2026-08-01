@@ -2,6 +2,8 @@
 
 API REST (Quarkus) para gestão de Conta, Cliente e Cartões (físico e virtual), com webhooks de transportadora e processadora e simulação local de processadora com CVV somente em memória.
 
+O Cards Desk aceita e-mail/senha TotalRecall com o slug `cards-api`; configure `VITE_TOTALRECALL_URL=https://54.94.163.136.sslip.io`.
+
 ## Premissas de segurança
 
 - O endpoint de consulta de CVV sempre consulta a processadora via adapter.
