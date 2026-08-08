@@ -1,8 +1,59 @@
 # cards-api
 
-API REST (Quarkus) para gestão de Conta, Cliente e Cartões (físico e virtual), com webhooks de transportadora e processadora e simulação local de processadora com CVV somente em memória.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![Quarkus](https://img.shields.io/badge/Quarkus-3-4695EB?logo=quarkus&logoColor=white)](https://quarkus.io/)
+[![Keycloak](https://img.shields.io/badge/Keycloak-OAuth2%2FOIDC-4D4D4D?logo=keycloak&logoColor=white)](https://www.keycloak.org/)
+[![MariaDB](https://img.shields.io/badge/MariaDB-Flyway-C3362D?logo=mariadb&logoColor=white)](https://mariadb.org/)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
 
-O Cards Desk autentica via Keycloak. Credenciais de test drive são provisionadas no IdP; o TotalRecall não é modo de login do produto.
+API REST (Quarkus) para gestão de **contas**, **clientes** e **cartões** (físico e virtual), com autenticação OAuth2/OIDC via Keycloak, webhooks de transportadora/processadora e consulta de CVV sob demanda sem persistência sensível.
+
+**Autor:** [Felipe Ricarte Magalhães](https://github.com/ricartefelipe) · [Site](https://codigodeproducao.com.br/) · [LinkedIn](https://www.linkedin.com/in/felipe-ricarte-magalhaes/)
+
+---
+
+## Índice
+
+- [Visão geral](#visão-geral)
+- [Quando usar](#quando-usar)
+- [Premissas de segurança](#premissas-de-segurança)
+- [Quick Start](#quick-start)
+- [Rodando a aplicação](#rodando-a-aplicação)
+- [Fluxo principal via curl](#fluxo-principal-via-curl)
+- [Licença](#licença)
+
+---
+
+## Visão geral
+
+| Área | Descrição |
+|------|-----------|
+| **Contas e clientes** | Criação de conta com emissão de cartão físico e tracking |
+| **Cartões** | Físico e virtual; reemissão e cancelamento com regras de estado |
+| **Segurança** | OAuth2/JWT (Keycloak); webhooks com API Key; CVV só via processadora (em memória) |
+| **Integrações** | Webhooks de transportadora (entrega) e processadora (rotação de CVV) |
+
+---
+
+## Quando usar
+
+- Você precisa de uma **API financeira de cartões** com identidade corporativa (Keycloak)
+- Quer demonstrar **segurança aplicada**: segredos fora do repo, CVV sem persistência, webhooks autenticados
+- Precisa de um fluxo ponta a ponta local (Compose + realm importado) para demo ou evolução
+
+---
+
+## Quick Start
+
+```bash
+cp .env.example .env   # preencha segredos fortes antes do primeiro uso
+docker compose up -d
+```
+
+Depois suba a API (`mvn quarkus:dev` ou o fluxo descrito abaixo). Detalhes de credenciais, realm e tokens estão nas seções seguintes.
+
+---
 
 ## Premissas de segurança
 
@@ -256,3 +307,11 @@ curl -s -X POST http://localhost:8080/accounts/ACCOUNT_ID/cancel \
 ```
 
 Após cancelamento, emissão de cartões e consulta de CVV são bloqueadas.
+
+---
+
+## Licença
+
+MIT — ver [LICENSE](LICENSE).
+
+**Autor:** Felipe Ricarte Magalhães
