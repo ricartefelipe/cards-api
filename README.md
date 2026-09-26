@@ -1,4 +1,4 @@
-# cards-api
+# Cards API
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
@@ -7,182 +7,148 @@
 [![MariaDB](https://img.shields.io/badge/MariaDB-Flyway-C3362D?logo=mariadb&logoColor=white)](https://mariadb.org/)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
 
-API REST (Quarkus) para gestão de **contas**, **clientes** e **cartões** (físico e virtual), com autenticação OAuth2/OIDC via Keycloak, webhooks de transportadora/processadora e consulta de CVV sob demanda sem persistência sensível.
+API financeira para gestão de contas, clientes e cartões físicos e virtuais.
 
-**Autor:** [Felipe Ricarte Magalhães](https://github.com/ricartefelipe) · [Site](https://codigodeproducao.com.br/) · [LinkedIn](https://www.linkedin.com/in/felipe-ricarte-magalhaes/)
+O projeto concentra o fluxo de emissão, entrega, validação, reemissão e cancelamento de cartões, com autenticação OAuth2/OIDC via Keycloak e integrações por webhook com transportadora e processadora.
 
----
-
-## Índice
-
-- [Visão geral](#visão-geral)
-- [Quando usar](#quando-usar)
-- [Premissas de segurança](#premissas-de-segurança)
-- [Quick Start](#quick-start)
-- [Rodando a aplicação](#rodando-a-aplicação)
-- [Fluxo principal via curl](#fluxo-principal-via-curl)
-- [Licença](#licença)
-
----
+Uma das decisões centrais é não persistir CVV: a consulta é feita sob demanda por adapter e o valor recebido permanece apenas em memória pelo período definido.
 
 ## Visão geral
 
-| Área | Descrição |
-|------|-----------|
-| **Contas e clientes** | Criação de conta com emissão de cartão físico e tracking |
-| **Cartões** | Físico e virtual; reemissão e cancelamento com regras de estado |
-| **Segurança** | OAuth2/JWT (Keycloak); webhooks com API Key; CVV só via processadora (em memória) |
-| **Integrações** | Webhooks de transportadora (entrega) e processadora (rotação de CVV) |
-
----
-
-## Quando usar
-
-- Você precisa de uma **API financeira de cartões** com identidade corporativa (Keycloak)
-- Quer demonstrar **segurança aplicada**: segredos fora do repo, CVV sem persistência, webhooks autenticados
-- Precisa de um fluxo ponta a ponta local (Compose + realm importado) para demo ou evolução
-
----
-
-## Quick Start
-
-```bash
-cp .env.example .env   # preencha segredos fortes antes do primeiro uso
-docker compose up -d
-```
-
-Depois suba a API (`mvn quarkus:dev` ou o fluxo descrito abaixo). Detalhes de credenciais, realm e tokens estão nas seções seguintes.
-
----
+| Área | Responsabilidade |
+|------|------------------|
+| **Contas e clientes** | Cadastro e criação da conta |
+| **Cartão físico** | Emissão, tracking, entrega, validação e reemissão |
+| **Cartão virtual** | Emissão, consulta de CVV e reemissão |
+| **Segurança** | OAuth2/OIDC, JWT e API keys para webhooks |
+| **Integrações** | Transportadora e processadora |
+| **Persistência** | MariaDB com Flyway |
+| **Testes** | JUnit e relatório de cobertura JaCoCo |
 
 ## Premissas de segurança
 
-- O endpoint de consulta de CVV sempre consulta a processadora via adapter.
-- Webhooks exigem API Key via header `X-Webhook-Api-Key`.
-- Endpoints de conta e cartões exigem autenticação OAuth2 + JWT (Keycloak).
-- A aplicação não registra CVV em logs.
+- Endpoints de contas e cartões exigem Bearer token JWT válido.
+- Webhooks exigem API Key via `X-Webhook-Api-Key`.
+- O CVV não é persistido no banco.
+- O CVV não deve aparecer em logs.
+- Segredos e credenciais não devem ser commitados.
+- Configuração de produção deve usar um provedor OIDC externo e credenciais próprias.
+
+## Stack
+
+| Camada | Tecnologia |
+|--------|------------|
+| Runtime | Java 21, Quarkus 3 |
+| Segurança | Keycloak, OAuth2/OIDC, JWT |
+| Dados | MariaDB, Flyway |
+| API | REST, OpenAPI, Swagger UI |
+| Infra local | Docker Compose |
+| Testes | JUnit, JaCoCo |
 
 ## Requisitos
 
 - Java 21
 - Maven
-- Docker (serviços locais em `docker-compose.yml`: MariaDB e Keycloak opcional/fora dos Dev Services)
+- Docker e Docker Compose
 
-## Subindo dependências
+## Quick Start
 
-> **Credenciais:** Nunca comite `.env`. Gere valores fortes antes do primeiro uso (por exemplo `openssl rand -hex 24`). Para `KEYCLOAK_CLIENT_SECRET`, deve coincidir com o segredo configurado para o client `backend-service` no ficheiro `src/main/resources/quarkus-realm.json` importado pelo Keycloak ao subir via Compose (`docker compose`/Keycloak aceita também rotações feitas só no servidor). Quem alterar passwords ou segredos deve regenerar também o realm conforme política da equipa ou via consola do Keycloak. Valores já expostos em repositório ou histórico devem considerar-se inválidos: substitua todos nos ambientes reais independentemente das alterações feitas ao código-fonte.
-
-Antes do primeiro `docker compose up`, crie `.env` na raiz (este ficheiro está no `.gitignore`):
+Crie o arquivo local de variáveis:
 
 ```bash
 cp .env.example .env
 ```
 
-Consulte `.env.example` para os nomes obrigatórios; preencha cada variável antes de iniciar Compose ou Quarkus (`mvn quarkus:dev` também lê `.env`).
+Preencha os segredos antes de iniciar o ambiente.
+
+Depois:
 
 ```bash
 docker compose up -d
+mvn quarkus:dev
 ```
 
-Banco local (MariaDB no compose — serviço `mysql`; driver JDBC padrão `jdbc:mariadb://`):
-- host: localhost
-- porta: 3306
-- database: cards_api
-- user: `cards` (ou `MARIADB_USER` no `.env`)
-- password: o valor de `MARIADB_PASSWORD` / `DB_PASSWORD` no `.env`
-- root password: `MARIADB_ROOT_PASSWORD` no `.env`
+Endpoints locais:
 
-Keycloak (docker-compose, opcional em dev):
-- URL: http://localhost:8180
-- Conta de **administração do servidor** (KC bootstrap): defina apenas no `.env`, com credenciais fortes próprias.
-- Realm `quarkus` é importado a partir de `src/main/resources/quarkus-realm.json`, incluindo o client confidencial `backend-service`; o seu `.env` deve usar o mesmo `KEYCLOAK_CLIENT_SECRET` (`KEYCLOAK_CLIENT_SECRET` igual ao campo `secret` desse client no JSON). Utilizadores de realm existentes servem apenas para desenvolvimento: altere sempre as passwords antes de usar fora da sua máquina (consola ou novo export/regeneração dos hashes).
+- API: `http://localhost:8080`
+- OpenAPI: `http://localhost:8080/openapi`
+- Swagger UI: `http://localhost:8080/q/swagger-ui`
+- Keycloak: `http://localhost:8180`
 
-Para obter o segredo atual do client `backend-service` no repositório (por exemplo antes de gravar `.env`), pode usar:
+Flyway aplica as migrations automaticamente no startup.
 
-```bash
-python3 - <<'PY'
-import json
-from pathlib import Path
-realm = Path("src/main/resources/quarkus-realm.json")
-with realm.open(encoding="utf-8") as f:
-    doc = json.load(f)
-secret = next(
-    (c["secret"] for c in doc.get("clients", []) if c.get("clientId") == "backend-service"),
-    None,
-)
-assert secret is not None, "realm sem client backend-service"
-print(secret)
-PY
+## Banco local
+
+O serviço MariaDB do Compose utiliza:
+
+- host: `localhost`
+- porta: `3306`
+- database: `cards_api`
+- usuário: `cards` ou `MARIADB_USER`
+- senha: `MARIADB_PASSWORD` / `DB_PASSWORD`
+
+As credenciais devem permanecer no `.env`.
+
+## Keycloak
+
+O realm `quarkus` é importado de:
+
+```text
+src/main/resources/quarkus-realm.json
 ```
 
-## Configuração
+O client confidencial utilizado pela API é `backend-service`.
 
-A aplicação **não** usa senhas ou API keys fictícias por omissão em `application.properties`. Carregue um ficheiro `.env` na raiz (o Quarkus lê-o em dev) ou exporte manualmente os mesmos nomes antes de arrancar.
+Em desenvolvimento, a aplicação usa por padrão:
+
+```text
+http://localhost:8180
+```
+
+Em produção, `KEYCLOAK_URL` e `KEYCLOAK_CLIENT_SECRET` devem ser definidos explicitamente.
+
+Variáveis principais:
 
 ```bash
-# Alternativa ao .env na raiz (equivale aos campos relevantes em .env.example)
-export DB_PASSWORD=<valor>
-export CARRIER_WEBHOOK_API_KEY=<valor>
-export PROCESSOR_WEBHOOK_API_KEY=<valor>
+export KEYCLOAK_URL=http://localhost:8180
+export KEYCLOAK_REALM=quarkus
 export KEYCLOAK_CLIENT_SECRET=<valor>
 ```
 
-OAuth2 / Keycloak:
-
-- Em **desenvolvimento** (`quarkus:dev`), por omissão: `KEYCLOAK_URL` pode ser omitido desde que utilize `http://localhost:8180` (ver `%dev.quarkus.oidc.auth-server-url`).
-- Em **produção** (`-Dquarkus.profile=prod`): `KEYCLOAK_URL` e `KEYCLOAK_CLIENT_SECRET` são obrigatórios.
-
-```bash
-export KEYCLOAK_URL=http://localhost:8180   # exemplo; em prod use a URL real do IAM
-export KEYCLOAK_REALM=quarkus
-export KEYCLOAK_CLIENT_SECRET=<KEYCLOAK_CLIENT_SECRET>
-```
-
-Outras JDBC / TTL:
+Configuração JDBC:
 
 ```bash
 export DB_JDBC_URL="jdbc:mariadb://localhost:3306/cards_api?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
 export DB_USERNAME=cards
-export DB_PASSWORD=<DB_PASSWORD>
+export DB_PASSWORD=<valor>
 export CVV_DEFAULT_TTL_SECONDS=900
 ```
 
-## Rodando a aplicação
+Webhooks:
 
 ```bash
-mvn quarkus:dev
+export CARRIER_WEBHOOK_API_KEY=<valor>
+export PROCESSOR_WEBHOOK_API_KEY=<valor>
 ```
 
-Flyway aplica as migrations automaticamente no startup.
+## Docker Compose e Dev Services
 
-Em modo dev, por omissão podem correr **Dev Services** (por exemplo Keycloak com o realm `quarkus`); se optar por infraestrutura apenas via **Docker Compose**, veja a secção seguinte para evitar sobreposição nas portas **3306** e **8180**.
+O Compose disponibiliza normalmente MariaDB em `3306` e Keycloak em `8180`.
 
-### Docker Compose versus Dev Services
+Ao executar `mvn quarkus:dev`, o Quarkus pode tentar iniciar Dev Services próprios. Para evitar duplicidade ou conflito de portas quando estiver usando o Compose:
 
-- O Compose deste repositório usa usualmente **MariaDB na porta 3306** e **Keycloak na 8180** (`docker compose up -d`).
-- Com **`mvn quarkus:dev`**, o Quarkus pode iniciar **contentores próprios** (Dev Services) para base de dados e OIDC, consoante as extensões e se já há algo à escuta nas portas envolvidas.
-- Para **evitar duplicar serviços ou falhas por porta em uso**:
-  - Se quiser usar **só** o MariaDB e o Keycloak do **Compose**, desative no perfil `dev` os Dev Services que repetem o mesmo papel, por exemplo `quarkus.datasource.devservices.enabled=false` e `quarkus.keycloak.devservices.enabled=false`.
-  - Alinhe o **OIDC** ao Keycloak que está a usar (URL do realm). Em **dev** o URL padrão é `http://localhost:8180` (ver `application.properties`); em **produção** `KEYCLOAK_URL` tem de ser definido explicitamente.
-- Na prática: **não combine** dois Keycloaks ou duas bases a disputar **a mesma porta** (3306, 8180) sem configurar uma das partes explicitamente para outra porta ou para ficar desligada.
-
-OpenAPI:
-- http://localhost:8080/openapi
-- http://localhost:8080/q/swagger-ui
-
-## Rodando testes
-
-```bash
-mvn test
+```properties
+quarkus.datasource.devservices.enabled=false
+quarkus.keycloak.devservices.enabled=false
 ```
 
-Após os testes, o JaCoCo gera relatório HTML de cobertura em `target/site/jacoco/index.html`.
+Use apenas uma instância de banco e uma instância de Keycloak por ambiente, ou configure portas diferentes explicitamente.
 
-## Autenticação OAuth2 + JWT
+## Autenticação
 
-Os endpoints `/accounts`, `/physical-cards` e `/virtual-cards` exigem Bearer token JWT válido. Os webhooks continuam usando API Key.
+Os endpoints `/accounts`, `/physical-cards` e `/virtual-cards` exigem JWT.
 
-### Obter token (Keycloak)
+Exemplo de obtenção de token:
 
 ```bash
 export ACCESS_TOKEN=$(curl -s -X POST "http://localhost:8180/realms/quarkus/protocol/openid-connect/token" \
@@ -191,17 +157,19 @@ export ACCESS_TOKEN=$(curl -s -X POST "http://localhost:8180/realms/quarkus/prot
   -d "username=alice&password=${ALICE_PASSWORD}&grant_type=password" | jq -r '.access_token')
 ```
 
-Defina `KEYCLOAK_CLIENT_SECRET` conforme `.env`; `ALICE_PASSWORD` deve ser uma password válida configurada para o utilizador `alice` no Keycloak utilizado pela sua cópia do realm ou equivalente atualizado.
-
-### Chamadas autenticadas
+Exemplo de chamada autenticada:
 
 ```bash
-curl -s -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8080/accounts
+curl -s \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  http://localhost:8080/accounts
 ```
 
-## Fluxo principal via curl
+## Fluxo principal
 
-### 1) Criar conta (cria customer + account + emite físico e gera tracking)
+### 1. Criar conta
+
+A criação da conta também cria o cliente, emite o cartão físico e gera o tracking.
 
 ```bash
 curl -s -X POST http://localhost:8080/accounts \
@@ -225,12 +193,15 @@ curl -s -X POST http://localhost:8080/accounts \
   }'
 ```
 
-Resposta contém `account_id`, `customer_id`, `physical_card_id`, `tracking_id`.
+A resposta contém `account_id`, `customer_id`, `physical_card_id` e `tracking_id`.
 
-### 2) Webhook da transportadora (marcar entrega)
+### 2. Confirmar entrega pela transportadora
 
 ```bash
-curl -s -X POST http://localhost:8080/webhooks/carrier/delivery   -H 'Content-Type: application/json'   -H "X-Webhook-Api-Key: ${CARRIER_WEBHOOK_API_KEY}"   -d '{
+curl -s -X POST http://localhost:8080/webhooks/carrier/delivery \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Api-Key: ${CARRIER_WEBHOOK_API_KEY}" \
+  -d '{
     "tracking_id": "TRACKING_DO_RESPONSE",
     "delivery_status": "DELIVERED",
     "delivery_date": "2026-01-31T12:00:00",
@@ -239,35 +210,41 @@ curl -s -X POST http://localhost:8080/webhooks/carrier/delivery   -H 'Content-Ty
   }'
 ```
 
-### 3) Validar cartão físico (após entregue)
+### 3. Validar cartão físico
 
 ```bash
-curl -s -X POST http://localhost:8080/physical-cards/PHYSICAL_CARD_ID/validate \
+curl -s -X POST \
+  http://localhost:8080/physical-cards/PHYSICAL_CARD_ID/validate \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-### 4) Emitir cartão virtual (exige físico entregue e validado)
+### 4. Emitir cartão virtual
+
+A emissão exige cartão físico entregue e validado.
 
 ```bash
-curl -s -X POST http://localhost:8080/accounts/ACCOUNT_ID/virtual-cards \
+curl -s -X POST \
+  http://localhost:8080/accounts/ACCOUNT_ID/virtual-cards \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-Resposta contém `virtual_card_id` e `processor_card_id`.
-
-### 5) Consultar CVV do cartão virtual (on demand)
+### 5. Consultar CVV
 
 ```bash
-curl -s http://localhost:8080/virtual-cards/VIRTUAL_CARD_ID/cvv \
+curl -s \
+  http://localhost:8080/virtual-cards/VIRTUAL_CARD_ID/cvv \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-Resposta contém `cvv` e `expiration_date`.
+O retorno contém `cvv` e `expiration_date`. O valor não é persistido.
 
-### 6) Webhook da processadora (rotação automática de CVV)
+### 6. Rotação de CVV pela processadora
 
 ```bash
-curl -s -X POST http://localhost:8080/webhooks/processor/cvv-rotation   -H 'Content-Type: application/json'   -H "X-Webhook-Api-Key: ${PROCESSOR_WEBHOOK_API_KEY}"   -d '{
+curl -s -X POST http://localhost:8080/webhooks/processor/cvv-rotation \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Api-Key: ${PROCESSOR_WEBHOOK_API_KEY}" \
+  -d '{
     "account_id": "PROCESSOR_ACCOUNT_ID",
     "card_id": "PROCESSOR_CARD_ID",
     "next_cvv": 123,
@@ -275,43 +252,56 @@ curl -s -X POST http://localhost:8080/webhooks/processor/cvv-rotation   -H 'Cont
   }'
 ```
 
-O CVV recebido é mantido apenas na memória do processo, com TTL até `expiration_date`.
+O CVV recebido permanece apenas em memória, respeitando o TTL informado.
 
-### 7) Reemitir físico (perda/roubo/dano)
+### 7. Reemitir cartão físico
 
 ```bash
-curl -s -X POST http://localhost:8080/physical-cards/PHYSICAL_CARD_ID/reissue \
+curl -s -X POST \
+  http://localhost:8080/physical-cards/PHYSICAL_CARD_ID/reissue \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -d '{ "reason": "LOSS" }'
 ```
 
-Motivos válidos (`reason`): `LOSS`, `THEFT`, `DAMAGE`.
+Motivos aceitos:
 
-### 8) Reemitir cartão virtual (perda/roubo/dano)
+- `LOSS`
+- `THEFT`
+- `DAMAGE`
+
+### 8. Reemitir cartão virtual
 
 ```bash
-curl -s -X POST http://localhost:8080/virtual-cards/VIRTUAL_CARD_ID/reissue \
+curl -s -X POST \
+  http://localhost:8080/virtual-cards/VIRTUAL_CARD_ID/reissue \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -d '{ "reason": "THEFT" }'
 ```
 
-Motivos válidos (`reason`): `LOSS`, `THEFT`, `DAMAGE`.
-
-### 9) Cancelar conta (desativa conta e cartões)
+### 9. Cancelar conta
 
 ```bash
-curl -s -X POST http://localhost:8080/accounts/ACCOUNT_ID/cancel \
+curl -s -X POST \
+  http://localhost:8080/accounts/ACCOUNT_ID/cancel \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-Após cancelamento, emissão de cartões e consulta de CVV são bloqueadas.
+O cancelamento desativa a conta e bloqueia novas emissões e consultas de CVV.
 
----
+## Testes
+
+```bash
+mvn test
+```
+
+O relatório JaCoCo é gerado em:
+
+```text
+target/site/jacoco/index.html
+```
 
 ## Licença
 
 MIT — ver [LICENSE](LICENSE).
-
-**Autor:** Felipe Ricarte Magalhães
