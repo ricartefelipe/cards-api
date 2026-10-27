@@ -1,29 +1,49 @@
-name: Sync master with develop
+name: Check develop vs master
+
+# ATENCAO (acao do proprietario): a versao anterior deste workflow fazia
+# `git reset --hard origin/develop` + `git push --force` em master. Editar este
+# arquivo na feature NAO desativa execucoes disparadas por outras refs ja publicadas.
+# O proprietario deve desativar/apagar o workflow antigo perigoso no GitHub antes do
+# proximo push. Esta versao e somente leitura: nao escreve, nao faz merge, nao cria PR.
 
 on:
+  workflow_dispatch:
   push:
     branches: [develop]
-  workflow_dispatch:
-
-concurrency:
-  group: sync-master-with-develop
-  cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: check-develop-vs-master
+  cancel-in-progress: true
 
 jobs:
-  sync:
+  check:
+    name: Relatar divergencia (sem escrever)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Advance master to match develop
+      - name: Comparar develop e master
         run: |
           set -euo pipefail
           git fetch origin master develop
-          git checkout master
-          git reset --hard origin/develop
-          git push origin master --force-with-lease
+          ahead=$(git rev-list --count origin/master..origin/develop)
+          behind=$(git rev-list --count origin/develop..origin/master)
+          echo "develop esta $ahead commit(s) a frente e $behind atras de master."
+          {
+            echo "### Divergencia develop vs master"
+            echo ""
+            echo "- develop a frente de master: **$ahead** commit(s)"
+            echo "- develop atras de master: **$behind** commit(s)"
+            echo ""
+            if [ "$ahead" -gt 0 ]; then
+              echo "Promova via PR manual (revisao do proprietario):"
+              echo "${{ github.server_url }}/${{ github.repository }}/compare/master...develop?expand=1"
+            else
+              echo "Nada a promover."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
