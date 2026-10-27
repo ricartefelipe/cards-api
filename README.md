@@ -28,11 +28,13 @@ Uma das decisões centrais é não persistir CVV: a consulta é feita sob demand
 ## Premissas de segurança
 
 - Endpoints de contas e cartões exigem Bearer token JWT válido.
-- Webhooks exigem API Key via `X-Webhook-Api-Key`.
-- O CVV não é persistido no banco.
-- O CVV não deve aparecer em logs.
-- Segredos e credenciais não devem ser commitados.
-- Configuração de produção deve usar um provedor OIDC externo e credenciais próprias.
+- **Autorização por objeto:** o titular (papel `user`) só acessa os próprios cartões — a posse é derivada do `subject` do token, não do papel. Acesso a recurso de outro titular responde como "não encontrado" (não vaza existência).
+- **Papéis:** `/accounts` e `/customers` são operações administrativas/suporte (`admin`). Os endpoints de cartão (`/virtual-cards`, `/physical-cards`) são do titular (`user`), com `admin` tendo acesso pleno.
+- Webhooks exigem API Key via `X-Webhook-Api-Key` (comparação em tempo constante); reenvio de evento igual/antigo é idempotente e não regride o estado.
+- O CVV não é persistido no banco, não aparece em logs e a resposta vem com `Cache-Control: no-store`.
+- Segredos e credenciais não são commitados; **em produção não há defaults** — a aplicação recusa iniciar sem eles.
+- **Produção é fail-closed:** sem adaptador real de processadora/transportadora contratado, a inicialização é recusada. Os simuladores são restritos a dev/test.
+- Detalhes e matriz de fechamento: ver [`docs/hardening/`](docs/hardening/).
 
 ## Stack
 
@@ -146,9 +148,21 @@ Use apenas uma instância de banco e uma instância de Keycloak por ambiente, ou
 
 ## Autenticação
 
-Os endpoints `/accounts`, `/physical-cards` e `/virtual-cards` exigem JWT.
+Todos os endpoints de negócio exigem JWT. Os papéis determinam o acesso:
 
-Exemplo de obtenção de token:
+- `/accounts` e `/customers`: papel `admin` (operações administrativas/suporte).
+- `/virtual-cards` e `/physical-cards`: papel `user` restrito aos próprios cartões (ou `admin` com acesso pleno).
+
+Token de administrador (gestão de contas/clientes):
+
+```bash
+export ADMIN_TOKEN=$(curl -s -X POST "http://localhost:8180/realms/quarkus/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -u "backend-service:${KEYCLOAK_CLIENT_SECRET}" \
+  -d "username=admin&password=${ADMIN_PASSWORD}&grant_type=password" | jq -r '.access_token')
+```
+
+Token do titular (acesso aos próprios cartões):
 
 ```bash
 export ACCESS_TOKEN=$(curl -s -X POST "http://localhost:8180/realms/quarkus/protocol/openid-connect/token" \
@@ -157,13 +171,17 @@ export ACCESS_TOKEN=$(curl -s -X POST "http://localhost:8180/realms/quarkus/prot
   -d "username=alice&password=${ALICE_PASSWORD}&grant_type=password" | jq -r '.access_token')
 ```
 
-Exemplo de chamada autenticada:
+Exemplo de chamada administrativa:
 
 ```bash
 curl -s \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   http://localhost:8080/accounts
 ```
+
+> Para vincular um titular `user` à sua conta, a criação da conta aceita o campo
+> opcional `customer.subject` com o `sub` do usuário no IdP. Sem esse vínculo, um
+> `user` não enxerga cartões (fail-closed); o `admin` continua com acesso pleno.
 
 ## Fluxo principal
 
@@ -174,13 +192,14 @@ A criação da conta também cria o cliente, emite o cartão físico e gera o tr
 ```bash
 curl -s -X POST http://localhost:8080/accounts \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{
     "customer": {
       "full_name": "Fulano de Tal",
       "document": "12345678900",
       "email": "fulano@example.com",
-      "phone": "+55 85 99999-9999"
+      "phone": "+55 85 99999-9999",
+      "subject": "ID_DO_TITULAR_NO_IDP"
     },
     "address": {
       "street": "Rua A",
@@ -225,7 +244,7 @@ A emissão exige cartão físico entregue e validado.
 ```bash
 curl -s -X POST \
   http://localhost:8080/accounts/ACCOUNT_ID/virtual-cards \
-  -H "Authorization: Bearer $ACCESS_TOKEN"
+  -H "Authorization: Bearer $ADMIN_TOKEN"
 ```
 
 ### 5. Consultar CVV
@@ -285,7 +304,7 @@ curl -s -X POST \
 ```bash
 curl -s -X POST \
   http://localhost:8080/accounts/ACCOUNT_ID/cancel \
-  -H "Authorization: Bearer $ACCESS_TOKEN"
+  -H "Authorization: Bearer $ADMIN_TOKEN"
 ```
 
 O cancelamento desativa a conta e bloqueia novas emissões e consultas de CVV.
