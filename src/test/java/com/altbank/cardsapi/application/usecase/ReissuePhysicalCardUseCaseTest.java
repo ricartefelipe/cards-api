@@ -7,6 +7,7 @@ import com.altbank.cardsapi.application.exception.ForbiddenException;
 import com.altbank.cardsapi.application.exception.NotFoundException;
 import com.altbank.cardsapi.application.port.CarrierPort;
 import com.altbank.cardsapi.application.port.PhysicalCardRepository;
+import com.altbank.cardsapi.application.security.OwnershipPolicy;
 import com.altbank.cardsapi.domain.model.Account;
 import com.altbank.cardsapi.domain.model.DeliveryStatus;
 import com.altbank.cardsapi.domain.model.PhysicalCard;
@@ -21,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static com.altbank.cardsapi.CardsTestFixtures.CLOCK;
+import static com.altbank.cardsapi.CardsTestFixtures.accountOwnedBy;
 import static com.altbank.cardsapi.CardsTestFixtures.activeAccount;
 import static com.altbank.cardsapi.CardsTestFixtures.activePhysicalUndelivered;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,12 +40,15 @@ class ReissuePhysicalCardUseCaseTest {
     @Mock
     CarrierPort carrierPort;
 
+    @Mock
+    OwnershipPolicy ownershipPolicy;
+
     @Test
     void reissue_whenMissing_shouldFail() {
         UUID id = UUID.randomUUID();
         when(physicalCardRepository.findById(id)).thenReturn(Optional.empty());
 
-        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, carrierPort, CLOCK);
+        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, carrierPort, ownershipPolicy, CLOCK);
 
         NotFoundException ex = Assertions.assertThrows(
                 NotFoundException.class,
@@ -60,8 +65,9 @@ class ReissuePhysicalCardUseCaseTest {
         PhysicalCard card = activePhysicalUndelivered(account);
 
         when(physicalCardRepository.findById(card.id())).thenReturn(Optional.of(card));
+        when(ownershipPolicy.canAccess(any())).thenReturn(true);
 
-        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, carrierPort, CLOCK);
+        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, carrierPort, ownershipPolicy, CLOCK);
 
         ForbiddenException ex = Assertions.assertThrows(
                 ForbiddenException.class,
@@ -78,8 +84,9 @@ class ReissuePhysicalCardUseCaseTest {
         card.deactivate(CLOCK);
 
         when(physicalCardRepository.findById(card.id())).thenReturn(Optional.of(card));
+        when(ownershipPolicy.canAccess(any())).thenReturn(true);
 
-        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, carrierPort, CLOCK);
+        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, carrierPort, ownershipPolicy, CLOCK);
 
         ForbiddenException ex = Assertions.assertThrows(
                 ForbiddenException.class,
@@ -95,10 +102,11 @@ class ReissuePhysicalCardUseCaseTest {
         PhysicalCard old = activePhysicalUndelivered(account);
 
         when(physicalCardRepository.findById(old.id())).thenReturn(Optional.of(old));
+        when(ownershipPolicy.canAccess(any())).thenReturn(true);
         when(carrierPort.createShipment(any()))
                 .thenReturn(new CarrierPort.CarrierShipment("trk_re", DeliveryStatus.PENDING));
 
-        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, carrierPort, CLOCK);
+        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, carrierPort, ownershipPolicy, CLOCK);
 
         ReissuePhysicalCardResponse response =
                 useCase.reissue(old.id(), new ReissuePhysicalCardRequest(ReissueReason.LOSS));
@@ -112,5 +120,24 @@ class ReissuePhysicalCardUseCaseTest {
         Assertions.assertEquals(ReissueReason.LOSS, created.reissueReason());
         Assertions.assertEquals(old.id().toString(), created.previousPhysicalCardId());
         Assertions.assertTrue(created.isActive());
+    }
+
+    @Test
+    void reissue_whenCallerIsNotOwner_shouldFailAsNotFoundWithoutSideEffects() {
+        Account account = accountOwnedBy("owner-b");
+        PhysicalCard old = activePhysicalUndelivered(account);
+        when(physicalCardRepository.findById(old.id())).thenReturn(Optional.of(old));
+        when(ownershipPolicy.canAccess(account)).thenReturn(false);
+
+        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, carrierPort, ownershipPolicy, CLOCK);
+
+        NotFoundException ex = Assertions.assertThrows(
+                NotFoundException.class,
+                () -> useCase.reissue(old.id(), new ReissuePhysicalCardRequest(ReissueReason.LOSS)));
+
+        Assertions.assertEquals(ErrorCode.CARD_NOT_FOUND, ex.errorCode());
+        Assertions.assertTrue(old.isActive());
+        verifyNoInteractions(carrierPort);
+        verify(physicalCardRepository, never()).persist(any(PhysicalCard.class));
     }
 }

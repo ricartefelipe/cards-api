@@ -10,13 +10,14 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
 @ApplicationScoped
-@RolesAllowed("user")
+@RolesAllowed("admin")
 @Path("/customers")
 @Produces(MediaType.APPLICATION_JSON)
 public class CustomersResource {
@@ -29,8 +30,9 @@ public class CustomersResource {
     }
 
     @GET
-    public List<CustomerSummaryResponse> list() {
-        return queryCustomersUseCase.list();
+    public List<CustomerSummaryResponse> list(@QueryParam("page") Integer page,
+                                              @QueryParam("size") Integer size) {
+        return queryCustomersUseCase.list(page, size);
     }
 
     @GET

@@ -8,6 +8,7 @@ import com.altbank.cardsapi.application.exception.ForbiddenException;
 import com.altbank.cardsapi.application.exception.NotFoundException;
 import com.altbank.cardsapi.application.port.CarrierPort;
 import com.altbank.cardsapi.application.port.PhysicalCardRepository;
+import com.altbank.cardsapi.application.security.OwnershipPolicy;
 import com.altbank.cardsapi.domain.model.Account;
 import com.altbank.cardsapi.domain.model.Customer;
 import com.altbank.cardsapi.domain.model.PhysicalCard;
@@ -22,12 +23,17 @@ public class ReissuePhysicalCardUseCase {
 
     private final PhysicalCardRepository physicalCardRepository;
     private final CarrierPort carrierPort;
+    private final OwnershipPolicy ownershipPolicy;
     private final Clock clock;
 
     @Inject
-    public ReissuePhysicalCardUseCase(PhysicalCardRepository physicalCardRepository, CarrierPort carrierPort, Clock clock) {
+    public ReissuePhysicalCardUseCase(PhysicalCardRepository physicalCardRepository,
+                                      CarrierPort carrierPort,
+                                      OwnershipPolicy ownershipPolicy,
+                                      Clock clock) {
         this.physicalCardRepository = Objects.requireNonNull(physicalCardRepository, "physicalCardRepository");
         this.carrierPort = Objects.requireNonNull(carrierPort, "carrierPort");
+        this.ownershipPolicy = Objects.requireNonNull(ownershipPolicy, "ownershipPolicy");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -37,6 +43,9 @@ public class ReissuePhysicalCardUseCase {
                 .orElseThrow(() -> new NotFoundException(ErrorCode.CARD_NOT_FOUND, "Physical card not found"));
 
         Account account = oldCard.account();
+        if (!ownershipPolicy.canAccess(account)) {
+            throw new NotFoundException(ErrorCode.CARD_NOT_FOUND, "Physical card not found");
+        }
         if (!account.isActive()) {
             throw new ForbiddenException(ErrorCode.ACCOUNT_CANCELLED, "Account is cancelled");
         }

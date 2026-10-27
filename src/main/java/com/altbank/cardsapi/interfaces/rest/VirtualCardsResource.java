@@ -22,6 +22,7 @@ import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import org.jboss.resteasy.reactive.RestResponse;
 
 @ApplicationScoped
 @RolesAllowed("user")
@@ -43,8 +44,10 @@ public class VirtualCardsResource {
     }
 
     @GET
-    public List<VirtualCardResponse> list(@QueryParam("accountId") UUID accountId) {
-        return queryVirtualCardsUseCase.list(accountId);
+    public List<VirtualCardResponse> list(@QueryParam("accountId") UUID accountId,
+                                          @QueryParam("page") Integer page,
+                                          @QueryParam("size") Integer size) {
+        return queryVirtualCardsUseCase.list(accountId, page, size);
     }
 
     @GET
@@ -55,8 +58,13 @@ public class VirtualCardsResource {
 
     @GET
     @Path("/{cardId}/cvv")
-    public CvvResponse getCvv(@PathParam("cardId") UUID cardId) {
-        return getVirtualCardCvvUseCase.get(cardId);
+    public RestResponse<CvvResponse> getCvv(@PathParam("cardId") UUID cardId) {
+        CvvResponse cvv = getVirtualCardCvvUseCase.get(cardId);
+        // Dado sensivel: impedir qualquer cache em proxies, browser ou intermediarios.
+        return RestResponse.ResponseBuilder.ok(cvv)
+                .header("Cache-Control", "no-store")
+                .header("Pragma", "no-cache")
+                .build();
     }
 
     @POST

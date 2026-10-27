@@ -20,6 +20,7 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.net.URI;
@@ -28,7 +29,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 @ApplicationScoped
-@RolesAllowed("user")
+@RolesAllowed("admin")
 @Path("/accounts")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
@@ -51,8 +52,9 @@ public class AccountsResource {
     }
 
     @GET
-    public List<AccountSummaryResponse> list() {
-        return queryAccountsUseCase.list();
+    public List<AccountSummaryResponse> list(@QueryParam("page") Integer page,
+                                             @QueryParam("size") Integer size) {
+        return queryAccountsUseCase.list(page, size);
     }
 
     @GET

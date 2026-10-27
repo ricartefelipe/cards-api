@@ -1,5 +1,6 @@
 package com.altbank.cardsapi.application.usecase;
 
+import com.altbank.cardsapi.application.PageRequest;
 import com.altbank.cardsapi.application.dto.AccountDetailResponse;
 import com.altbank.cardsapi.application.dto.AccountSummaryResponse;
 import com.altbank.cardsapi.application.dto.QueryResponses;
@@ -35,8 +36,10 @@ public class QueryAccountsUseCase {
     }
 
     @Transactional
-    public List<AccountSummaryResponse> list() {
-        return accountRepository.listAll().stream().map(QueryResponses::toAccountSummary).toList();
+    public List<AccountSummaryResponse> list(Integer page, Integer size) {
+        PageRequest pageRequest = PageRequest.of(page, size);
+        return accountRepository.listAll(pageRequest.offset(), pageRequest.limit())
+                .stream().map(QueryResponses::toAccountSummary).toList();
     }
 
     @Transactional

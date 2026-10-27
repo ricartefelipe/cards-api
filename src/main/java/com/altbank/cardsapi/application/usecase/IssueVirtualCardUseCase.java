@@ -1,6 +1,8 @@
 package com.altbank.cardsapi.application.usecase;
 
 import jakarta.inject.Inject;
+import com.altbank.cardsapi.application.audit.AuditAction;
+import com.altbank.cardsapi.application.audit.AuditService;
 import com.altbank.cardsapi.application.dto.IssueVirtualCardResponse;
 import com.altbank.cardsapi.application.exception.ConflictException;
 import com.altbank.cardsapi.application.exception.ErrorCode;
@@ -26,6 +28,7 @@ public class IssueVirtualCardUseCase {
     private final PhysicalCardRepository physicalCardRepository;
     private final VirtualCardRepository virtualCardRepository;
     private final ProcessorPort processorPort;
+    private final AuditService auditService;
     private final Clock clock;
 
     @Inject
@@ -33,11 +36,13 @@ public class IssueVirtualCardUseCase {
                                    PhysicalCardRepository physicalCardRepository,
                                    VirtualCardRepository virtualCardRepository,
                                    ProcessorPort processorPort,
+                                   AuditService auditService,
                                    Clock clock) {
         this.accountRepository = Objects.requireNonNull(accountRepository, "accountRepository");
         this.physicalCardRepository = Objects.requireNonNull(physicalCardRepository, "physicalCardRepository");
         this.virtualCardRepository = Objects.requireNonNull(virtualCardRepository, "virtualCardRepository");
         this.processorPort = Objects.requireNonNull(processorPort, "processorPort");
+        this.auditService = Objects.requireNonNull(auditService, "auditService");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -75,6 +80,8 @@ public class IssueVirtualCardUseCase {
                 clock
         );
         virtualCardRepository.persist(virtualCard);
+
+        auditService.record(AuditAction.ISSUE_VIRTUAL_CARD, "virtual_card", virtualCard.id());
 
         return new IssueVirtualCardResponse(virtualCard.id(), virtualCard.processorCardId(), virtualCard.cvvExpirationAt());
     }

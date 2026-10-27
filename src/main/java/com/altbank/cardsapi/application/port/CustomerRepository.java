@@ -8,6 +8,6 @@ import java.util.UUID;
 public interface CustomerRepository {
     Optional<Customer> findByDocument(String document);
     Optional<Customer> findById(UUID customerId);
-    List<Customer> listAll();
+    List<Customer> listAll(int offset, int limit);
     void persist(Customer customer);
 }

@@ -9,7 +9,7 @@ public interface VirtualCardRepository {
     Optional<VirtualCard> findById(UUID cardId);
     Optional<VirtualCard> findActiveByAccountId(UUID accountId);
     Optional<VirtualCard> findByProcessorCardId(String processorCardId);
-    List<VirtualCard> listAll();
+    List<VirtualCard> listAll(int offset, int limit);
     List<VirtualCard> listByAccountId(UUID accountId);
     void persist(VirtualCard virtualCard);
 }

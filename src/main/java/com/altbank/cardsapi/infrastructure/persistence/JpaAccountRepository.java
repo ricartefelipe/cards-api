@@ -34,11 +34,25 @@ public class JpaAccountRepository implements AccountRepository {
     }
 
     @Override
-    public List<Account> listAll() {
+    public Optional<Account> findBySubject(String subject) {
+        if (subject == null || subject.isBlank()) {
+            return Optional.empty();
+        }
+        return entityManager.createQuery(
+                        "SELECT a FROM Account a JOIN FETCH a.customer c WHERE c.subject = :subject", Account.class)
+                .setParameter("subject", subject)
+                .getResultStream()
+                .findFirst();
+    }
+
+    @Override
+    public List<Account> listAll(int offset, int limit) {
         return entityManager.createQuery(
                         "SELECT a FROM Account a JOIN FETCH a.customer ORDER BY a.createdAt DESC",
                         Account.class
                 )
+                .setFirstResult(offset)
+                .setMaxResults(limit)
                 .getResultList();
     }
 
