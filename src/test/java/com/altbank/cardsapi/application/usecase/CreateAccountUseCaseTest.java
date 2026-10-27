@@ -1,5 +1,6 @@
 package com.altbank.cardsapi.application.usecase;
 
+import com.altbank.cardsapi.application.audit.AuditService;
 import com.altbank.cardsapi.application.dto.CreateAccountRequest;
 import com.altbank.cardsapi.application.dto.CreateAccountResponse;
 import com.altbank.cardsapi.application.exception.ConflictException;
@@ -35,6 +36,8 @@ class CreateAccountUseCaseTest {
     PhysicalCardRepository physicalCardRepository;
     @Mock
     CarrierPort carrierPort;
+    @Mock
+    AuditService auditService;
 
     @Test
     void create_whenDocumentExists_shouldFail() {
@@ -43,7 +46,7 @@ class CreateAccountUseCaseTest {
         when(customerRepository.findByDocument("99887766554")).thenReturn(Optional.of(existing));
 
         CreateAccountUseCase useCase = new CreateAccountUseCase(
-                customerRepository, accountRepository, physicalCardRepository, carrierPort, CLOCK);
+                customerRepository, accountRepository, physicalCardRepository, carrierPort, auditService, CLOCK);
 
         ConflictException ex = Assertions.assertThrows(ConflictException.class, () -> useCase.create(req));
         Assertions.assertEquals(ErrorCode.CUSTOMER_ALREADY_EXISTS, ex.errorCode());
@@ -60,7 +63,7 @@ class CreateAccountUseCaseTest {
                 .thenReturn(new CarrierPort.CarrierShipment("trk_new", DeliveryStatus.SHIPPED));
 
         CreateAccountUseCase useCase = new CreateAccountUseCase(
-                customerRepository, accountRepository, physicalCardRepository, carrierPort, CLOCK);
+                customerRepository, accountRepository, physicalCardRepository, carrierPort, auditService, CLOCK);
 
         CreateAccountResponse response = useCase.create(req);
 

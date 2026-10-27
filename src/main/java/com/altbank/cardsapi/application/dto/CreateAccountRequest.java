@@ -13,7 +13,8 @@ public record CreateAccountRequest(
             @NotBlank String fullName,
             @NotBlank String document,
             @NotBlank @Email String email,
-            String phone
+            String phone,
+            String subject
     ) {
     }
 

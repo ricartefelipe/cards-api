@@ -48,11 +48,13 @@ public class JpaPhysicalCardRepository implements PhysicalCardRepository {
     }
 
     @Override
-    public List<PhysicalCard> listAll() {
+    public List<PhysicalCard> listAll(int offset, int limit) {
         return entityManager.createQuery(
                         "SELECT p FROM PhysicalCard p JOIN FETCH p.account ORDER BY p.createdAt DESC",
                         PhysicalCard.class
                 )
+                .setFirstResult(offset)
+                .setMaxResults(limit)
                 .getResultList();
     }
 

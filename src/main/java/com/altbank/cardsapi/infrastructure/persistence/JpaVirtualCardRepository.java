@@ -48,11 +48,13 @@ public class JpaVirtualCardRepository implements VirtualCardRepository {
     }
 
     @Override
-    public List<VirtualCard> listAll() {
+    public List<VirtualCard> listAll(int offset, int limit) {
         return entityManager.createQuery(
                         "SELECT v FROM VirtualCard v JOIN FETCH v.account ORDER BY v.createdAt DESC",
                         VirtualCard.class
                 )
+                .setFirstResult(offset)
+                .setMaxResults(limit)
                 .getResultList();
     }
 

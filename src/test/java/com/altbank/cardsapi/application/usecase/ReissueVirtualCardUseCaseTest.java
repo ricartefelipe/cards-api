@@ -3,8 +3,10 @@ package com.altbank.cardsapi.application.usecase;
 import com.altbank.cardsapi.application.dto.ReissueVirtualCardRequest;
 import com.altbank.cardsapi.application.exception.ErrorCode;
 import com.altbank.cardsapi.application.exception.ForbiddenException;
+import com.altbank.cardsapi.application.exception.NotFoundException;
 import com.altbank.cardsapi.application.port.ProcessorPort;
 import com.altbank.cardsapi.application.port.VirtualCardRepository;
+import com.altbank.cardsapi.application.security.OwnershipPolicy;
 import com.altbank.cardsapi.domain.model.Account;
 import com.altbank.cardsapi.domain.model.ReissueReason;
 import com.altbank.cardsapi.domain.model.VirtualCard;
@@ -19,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static com.altbank.cardsapi.CardsTestFixtures.CLOCK;
+import static com.altbank.cardsapi.CardsTestFixtures.accountOwnedBy;
 import static com.altbank.cardsapi.CardsTestFixtures.activeAccount;
 import static com.altbank.cardsapi.CardsTestFixtures.activeVirtual;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,6 +39,9 @@ class ReissueVirtualCardUseCaseTest {
     @Mock
     ProcessorPort processorPort;
 
+    @Mock
+    OwnershipPolicy ownershipPolicy;
+
     @Test
     void reissueVirtualCard_shouldDeactivateOldAndCreateNew() {
         Account account = activeAccount();
@@ -47,10 +53,11 @@ class ReissueVirtualCardUseCaseTest {
         UUID oldCardId = oldCard.id();
 
         when(virtualCardRepository.findById(oldCardId)).thenReturn(Optional.of(oldCard));
+        when(ownershipPolicy.canAccess(account)).thenReturn(true);
         when(processorPort.issueVirtualCard(processorAccountId))
                 .thenReturn(new ProcessorPort.IssuedVirtualCard(processorAccountId, "pc_new", LocalDateTime.of(2026, 1, 31, 12, 30, 0)));
 
-        ReissueVirtualCardUseCase useCase = new ReissueVirtualCardUseCase(virtualCardRepository, processorPort, CLOCK);
+        ReissueVirtualCardUseCase useCase = new ReissueVirtualCardUseCase(virtualCardRepository, processorPort, ownershipPolicy, CLOCK);
 
         var response = useCase.reissue(oldCardId, new ReissueVirtualCardRequest(ReissueReason.THEFT));
 
@@ -82,8 +89,9 @@ class ReissueVirtualCardUseCaseTest {
         VirtualCard oldCard = activeVirtual(account, "pc_old");
 
         when(virtualCardRepository.findById(oldCard.id())).thenReturn(Optional.of(oldCard));
+        when(ownershipPolicy.canAccess(account)).thenReturn(true);
 
-        ReissueVirtualCardUseCase useCase = new ReissueVirtualCardUseCase(virtualCardRepository, processorPort, CLOCK);
+        ReissueVirtualCardUseCase useCase = new ReissueVirtualCardUseCase(virtualCardRepository, processorPort, ownershipPolicy, CLOCK);
 
         ForbiddenException ex = Assertions.assertThrows(
                 ForbiddenException.class,
@@ -101,14 +109,34 @@ class ReissueVirtualCardUseCaseTest {
         oldCard.deactivate(CLOCK);
 
         when(virtualCardRepository.findById(oldCard.id())).thenReturn(Optional.of(oldCard));
+        when(ownershipPolicy.canAccess(account)).thenReturn(true);
 
-        ReissueVirtualCardUseCase useCase = new ReissueVirtualCardUseCase(virtualCardRepository, processorPort, CLOCK);
+        ReissueVirtualCardUseCase useCase = new ReissueVirtualCardUseCase(virtualCardRepository, processorPort, ownershipPolicy, CLOCK);
 
         ForbiddenException ex = Assertions.assertThrows(
                 ForbiddenException.class,
                 () -> useCase.reissue(oldCard.id(), new ReissueVirtualCardRequest(ReissueReason.DAMAGE)));
 
         Assertions.assertEquals(ErrorCode.CARD_INACTIVE, ex.errorCode());
+        verifyNoInteractions(processorPort);
+        verify(virtualCardRepository, never()).persist(any(VirtualCard.class));
+    }
+
+    @Test
+    void reissueVirtualCard_whenCallerIsNotOwner_shouldFailAsNotFoundWithoutSideEffects() {
+        Account account = accountOwnedBy("owner-b");
+        VirtualCard oldCard = activeVirtual(account, "pc_b");
+        when(virtualCardRepository.findById(oldCard.id())).thenReturn(Optional.of(oldCard));
+        when(ownershipPolicy.canAccess(account)).thenReturn(false);
+
+        ReissueVirtualCardUseCase useCase = new ReissueVirtualCardUseCase(virtualCardRepository, processorPort, ownershipPolicy, CLOCK);
+
+        NotFoundException ex = Assertions.assertThrows(
+                NotFoundException.class,
+                () -> useCase.reissue(oldCard.id(), new ReissueVirtualCardRequest(ReissueReason.THEFT)));
+
+        Assertions.assertEquals(ErrorCode.VIRTUAL_CARD_NOT_FOUND, ex.errorCode());
+        Assertions.assertTrue(oldCard.isActive());
         verifyNoInteractions(processorPort);
         verify(virtualCardRepository, never()).persist(any(VirtualCard.class));
     }

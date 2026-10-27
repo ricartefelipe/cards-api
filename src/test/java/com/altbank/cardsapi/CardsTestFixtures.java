@@ -20,8 +20,12 @@ public final class CardsTestFixtures {
     }
 
     public static Account activeAccount() {
+        return accountOwnedBy(null);
+    }
+
+    public static Account accountOwnedBy(String subject) {
         Address address = new Address("Rua A", "100", "Fortaleza", "CE", "60000-000", "BR");
-        Customer customer = new Customer("Fulano", "12345678900", "fulano@example.com", null, address, CLOCK);
+        Customer customer = new Customer("Fulano", "12345678900", "fulano@example.com", null, address, subject, CLOCK);
         return new Account(customer, CLOCK);
     }
 
@@ -70,7 +74,7 @@ public final class CardsTestFixtures {
 
     public static CreateAccountRequest validCreateAccountRequest() {
         return new CreateAccountRequest(
-                new CreateAccountRequest.CustomerInput("Fulano Novo", "99887766554", "novo@example.com", null),
+                new CreateAccountRequest.CustomerInput("Fulano Novo", "99887766554", "novo@example.com", null, null),
                 new CreateAccountRequest.AddressInput("Av B", "200", "São Paulo", "SP", "01000-000", "BR"));
     }
 }

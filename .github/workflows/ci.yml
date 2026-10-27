@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master, develop, 'feature/**', 'fix/**', 'release/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build e testes (Quarkus/Maven)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build, testes unitarios e empacotamento
+        run: mvn -ntp -B verify
+
+      - name: Testes de integracao (Dev Services / Docker)
+        run: mvn -ntp -B test -Dgroups=integration -DexcludedGroups=

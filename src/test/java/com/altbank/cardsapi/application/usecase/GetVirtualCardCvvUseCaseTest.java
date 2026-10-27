@@ -6,6 +6,7 @@ import com.altbank.cardsapi.application.exception.ForbiddenException;
 import com.altbank.cardsapi.application.exception.NotFoundException;
 import com.altbank.cardsapi.application.port.ProcessorPort;
 import com.altbank.cardsapi.application.port.VirtualCardRepository;
+import com.altbank.cardsapi.application.security.OwnershipPolicy;
 import com.altbank.cardsapi.domain.model.Account;
 import com.altbank.cardsapi.domain.model.VirtualCard;
 import java.time.LocalDateTime;
@@ -18,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static com.altbank.cardsapi.CardsTestFixtures.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -30,14 +32,31 @@ class GetVirtualCardCvvUseCaseTest {
     @Mock
     ProcessorPort processorPort;
 
+    @Mock
+    OwnershipPolicy ownershipPolicy;
+
+    private GetVirtualCardCvvUseCase useCase() {
+        return new GetVirtualCardCvvUseCase(virtualCardRepository, processorPort, ownershipPolicy);
+    }
+
     @Test
     void get_whenMissing_shouldFail() {
         UUID id = UUID.randomUUID();
         when(virtualCardRepository.findById(id)).thenReturn(Optional.empty());
 
-        GetVirtualCardCvvUseCase useCase = new GetVirtualCardCvvUseCase(virtualCardRepository, processorPort);
+        NotFoundException ex = Assertions.assertThrows(NotFoundException.class, () -> useCase().get(id));
+        Assertions.assertEquals(ErrorCode.VIRTUAL_CARD_NOT_FOUND, ex.errorCode());
+        verifyNoInteractions(processorPort);
+    }
 
-        NotFoundException ex = Assertions.assertThrows(NotFoundException.class, () -> useCase.get(id));
+    @Test
+    void get_whenCallerIsNotOwner_shouldFailAsNotFound() {
+        Account account = accountOwnedBy("owner-b");
+        VirtualCard card = activeVirtual(account, "pc_b");
+        when(virtualCardRepository.findById(card.id())).thenReturn(Optional.of(card));
+        when(ownershipPolicy.canAccess(account)).thenReturn(false);
+
+        NotFoundException ex = Assertions.assertThrows(NotFoundException.class, () -> useCase().get(card.id()));
         Assertions.assertEquals(ErrorCode.VIRTUAL_CARD_NOT_FOUND, ex.errorCode());
         verifyNoInteractions(processorPort);
     }
@@ -49,10 +68,9 @@ class GetVirtualCardCvvUseCaseTest {
         VirtualCard card = activeVirtual(account, "pc_1");
 
         when(virtualCardRepository.findById(card.id())).thenReturn(Optional.of(card));
+        when(ownershipPolicy.canAccess(any())).thenReturn(true);
 
-        GetVirtualCardCvvUseCase useCase = new GetVirtualCardCvvUseCase(virtualCardRepository, processorPort);
-
-        ForbiddenException ex = Assertions.assertThrows(ForbiddenException.class, () -> useCase.get(card.id()));
+        ForbiddenException ex = Assertions.assertThrows(ForbiddenException.class, () -> useCase().get(card.id()));
         Assertions.assertEquals(ErrorCode.ACCOUNT_CANCELLED, ex.errorCode());
         verifyNoInteractions(processorPort);
     }
@@ -64,25 +82,23 @@ class GetVirtualCardCvvUseCaseTest {
         card.deactivate(CLOCK);
 
         when(virtualCardRepository.findById(card.id())).thenReturn(Optional.of(card));
+        when(ownershipPolicy.canAccess(any())).thenReturn(true);
 
-        GetVirtualCardCvvUseCase useCase = new GetVirtualCardCvvUseCase(virtualCardRepository, processorPort);
-
-        ForbiddenException ex = Assertions.assertThrows(ForbiddenException.class, () -> useCase.get(card.id()));
+        ForbiddenException ex = Assertions.assertThrows(ForbiddenException.class, () -> useCase().get(card.id()));
         Assertions.assertEquals(ErrorCode.CARD_INACTIVE, ex.errorCode());
         verifyNoInteractions(processorPort);
     }
 
     @Test
-    void get_whenOk_shouldDelegateToProcessor() {
-        Account account = activeAccount();
+    void get_whenOwnerAndActive_shouldDelegateToProcessor() {
+        Account account = accountOwnedBy("owner-a");
         VirtualCard card = activeVirtual(account, "pc_ok");
         when(virtualCardRepository.findById(card.id())).thenReturn(Optional.of(card));
+        when(ownershipPolicy.canAccess(account)).thenReturn(true);
         when(processorPort.getCurrentCvv("pc_ok"))
                 .thenReturn(new ProcessorPort.CvvData(321, LocalDateTime.of(2026, 1, 31, 13, 0, 0)));
 
-        GetVirtualCardCvvUseCase useCase = new GetVirtualCardCvvUseCase(virtualCardRepository, processorPort);
-
-        CvvResponse response = useCase.get(card.id());
+        CvvResponse response = useCase().get(card.id());
         Assertions.assertEquals(321, response.cvv());
     }
 }

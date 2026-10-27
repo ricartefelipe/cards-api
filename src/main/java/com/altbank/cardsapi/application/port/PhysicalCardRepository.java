@@ -9,7 +9,7 @@ public interface PhysicalCardRepository {
     Optional<PhysicalCard> findById(UUID cardId);
     Optional<PhysicalCard> findByTrackingId(String trackingId);
     Optional<PhysicalCard> findActiveByAccountId(UUID accountId);
-    List<PhysicalCard> listAll();
+    List<PhysicalCard> listAll(int offset, int limit);
     List<PhysicalCard> listByAccountId(UUID accountId);
     void persist(PhysicalCard physicalCard);
 }

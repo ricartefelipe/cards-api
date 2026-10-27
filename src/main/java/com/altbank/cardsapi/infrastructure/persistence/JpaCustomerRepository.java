@@ -34,11 +34,13 @@ public class JpaCustomerRepository implements CustomerRepository {
     }
 
     @Override
-    public List<Customer> listAll() {
+    public List<Customer> listAll(int offset, int limit) {
         return entityManager.createQuery(
                         "SELECT c FROM Customer c ORDER BY c.createdAt DESC",
                         Customer.class
                 )
+                .setFirstResult(offset)
+                .setMaxResults(limit)
                 .getResultList();
     }
 
