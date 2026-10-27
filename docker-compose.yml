@@ -40,6 +40,10 @@ services:
       timeout: 5s
       retries: 30
 
+  # ATENCAO: esta imagem roda no perfil de PRODUCAO, que e fail-closed: sem adaptador
+  # real de processadora/transportadora contratado, a inicializacao e recusada
+  # (ProductionReadinessGuard) e o healthcheck nunca fica saudavel. Para uma DEMO
+  # funcional com simuladores, use `mvn quarkus:dev` (perfil dev, claramente demo).
   cards-api:
     build:
       context: .
@@ -59,6 +63,12 @@ services:
       CVV_DEFAULT_TTL_SECONDS: ${CVV_DEFAULT_TTL_SECONDS:-900}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080; echo -e 'GET /q/health/ready HTTP/1.1\\r\\nHost: 127.0.0.1\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     depends_on:
       mysql:
         condition: service_healthy
@@ -72,5 +82,7 @@ services:
     ports:
       - "${ADMIN_PORT:-9085}:80"
     depends_on:
-      - cards-api
-      - keycloak
+      cards-api:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy

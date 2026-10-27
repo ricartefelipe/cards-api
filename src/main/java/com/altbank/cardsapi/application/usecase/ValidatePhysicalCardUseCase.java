@@ -7,6 +7,7 @@ import com.altbank.cardsapi.application.exception.ErrorCode;
 import com.altbank.cardsapi.application.exception.ForbiddenException;
 import com.altbank.cardsapi.application.exception.NotFoundException;
 import com.altbank.cardsapi.application.port.PhysicalCardRepository;
+import com.altbank.cardsapi.application.security.OwnershipPolicy;
 import com.altbank.cardsapi.domain.model.Account;
 import com.altbank.cardsapi.domain.model.PhysicalCard;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -19,11 +20,15 @@ import java.util.UUID;
 public class ValidatePhysicalCardUseCase {
 
     private final PhysicalCardRepository physicalCardRepository;
+    private final OwnershipPolicy ownershipPolicy;
     private final Clock clock;
 
     @Inject
-    public ValidatePhysicalCardUseCase(PhysicalCardRepository physicalCardRepository, Clock clock) {
+    public ValidatePhysicalCardUseCase(PhysicalCardRepository physicalCardRepository,
+                                       OwnershipPolicy ownershipPolicy,
+                                       Clock clock) {
         this.physicalCardRepository = Objects.requireNonNull(physicalCardRepository, "physicalCardRepository");
+        this.ownershipPolicy = Objects.requireNonNull(ownershipPolicy, "ownershipPolicy");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -33,6 +38,9 @@ public class ValidatePhysicalCardUseCase {
                 .orElseThrow(() -> new NotFoundException(ErrorCode.CARD_NOT_FOUND, "Physical card not found"));
 
         Account account = card.account();
+        if (!ownershipPolicy.canAccess(account)) {
+            throw new NotFoundException(ErrorCode.CARD_NOT_FOUND, "Physical card not found");
+        }
         if (!account.isActive()) {
             throw new ForbiddenException(ErrorCode.ACCOUNT_CANCELLED, "Account is cancelled");
         }

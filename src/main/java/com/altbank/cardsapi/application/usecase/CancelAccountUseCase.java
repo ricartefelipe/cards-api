@@ -1,6 +1,8 @@
 package com.altbank.cardsapi.application.usecase;
 
 import jakarta.inject.Inject;
+import com.altbank.cardsapi.application.audit.AuditAction;
+import com.altbank.cardsapi.application.audit.AuditService;
 import com.altbank.cardsapi.application.dto.CancelAccountResponse;
 import com.altbank.cardsapi.application.exception.ErrorCode;
 import com.altbank.cardsapi.application.exception.NotFoundException;
@@ -24,6 +26,7 @@ public class CancelAccountUseCase {
     private final PhysicalCardRepository physicalCardRepository;
     private final VirtualCardRepository virtualCardRepository;
     private final ProcessorPort processorPort;
+    private final AuditService auditService;
     private final Clock clock;
 
     @Inject
@@ -31,11 +34,13 @@ public class CancelAccountUseCase {
                                PhysicalCardRepository physicalCardRepository,
                                VirtualCardRepository virtualCardRepository,
                                ProcessorPort processorPort,
+                               AuditService auditService,
                                Clock clock) {
         this.accountRepository = Objects.requireNonNull(accountRepository, "accountRepository");
         this.physicalCardRepository = Objects.requireNonNull(physicalCardRepository, "physicalCardRepository");
         this.virtualCardRepository = Objects.requireNonNull(virtualCardRepository, "virtualCardRepository");
         this.processorPort = Objects.requireNonNull(processorPort, "processorPort");
+        this.auditService = Objects.requireNonNull(auditService, "auditService");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -51,6 +56,8 @@ public class CancelAccountUseCase {
             card.deactivate(clock);
             processorPort.deactivateCard(card.processorCardId());
         });
+
+        auditService.record(AuditAction.CANCEL_ACCOUNT, "account", account.id());
 
         return new CancelAccountResponse(account.id(), account.cancelledAt());
     }

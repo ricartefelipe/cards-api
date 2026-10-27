@@ -34,7 +34,7 @@ public class VirtualCard extends Card {
     @Column(name = "reissue_reason", length = 24)
     private ReissueReason reissueReason;
 
-    @Column(name = "previous_virtual_card_id", length = 36)
+    @Column(name = "previous_virtual_card_id", length = 36, unique = true)
     private String previousVirtualCardId;
 
     protected VirtualCard() {
@@ -83,8 +83,21 @@ public class VirtualCard extends Card {
         return previousVirtualCardId;
     }
 
-    public void updateCvvExpirationAt(LocalDateTime expirationAt) {
-        this.cvvExpirationAt = expirationAt;
+    /**
+     * Aplica a rotacao de CVV apenas quando a nova expiracao e estritamente mais recente,
+     * para nao regredir o estado por evento repetido ou fora de ordem.
+     *
+     * @return {@code true} se a rotacao foi aplicada; {@code false} se ignorada por ser estale.
+     */
+    public boolean applyCvvRotation(LocalDateTime newExpiration) {
+        if (newExpiration == null) {
+            return false;
+        }
+        if (cvvExpirationAt != null && !newExpiration.isAfter(cvvExpirationAt)) {
+            return false;
+        }
+        this.cvvExpirationAt = newExpiration;
+        return true;
     }
 
     @Override

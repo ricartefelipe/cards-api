@@ -1,5 +1,6 @@
 package com.altbank.cardsapi.application.usecase;
 
+import com.altbank.cardsapi.application.audit.AuditService;
 import com.altbank.cardsapi.application.exception.ConflictException;
 import com.altbank.cardsapi.application.exception.ErrorCode;
 import com.altbank.cardsapi.application.exception.ForbiddenException;
@@ -48,13 +49,16 @@ class IssueVirtualCardUseCaseTest {
     @Mock
     ProcessorPort processorPort;
 
+    @Mock
+    AuditService auditService;
+
     @Test
     void issue_whenAccountMissing_shouldFail() {
         UUID id = UUID.randomUUID();
         when(accountRepository.findById(id)).thenReturn(Optional.empty());
 
         IssueVirtualCardUseCase useCase =
-                new IssueVirtualCardUseCase(accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+                new IssueVirtualCardUseCase(accountRepository, physicalCardRepository, virtualCardRepository, processorPort, auditService, CLOCK);
 
         NotFoundException ex = Assertions.assertThrows(NotFoundException.class, () -> useCase.issue(id));
         Assertions.assertEquals(ErrorCode.ACCOUNT_NOT_FOUND, ex.errorCode());
@@ -69,7 +73,7 @@ class IssueVirtualCardUseCaseTest {
         when(accountRepository.findById(account.id())).thenReturn(Optional.of(account));
 
         IssueVirtualCardUseCase useCase =
-                new IssueVirtualCardUseCase(accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+                new IssueVirtualCardUseCase(accountRepository, physicalCardRepository, virtualCardRepository, processorPort, auditService, CLOCK);
 
         ForbiddenException ex = Assertions.assertThrows(ForbiddenException.class, () -> useCase.issue(account.id()));
         Assertions.assertEquals(ErrorCode.ACCOUNT_CANCELLED, ex.errorCode());
@@ -84,7 +88,7 @@ class IssueVirtualCardUseCaseTest {
         when(physicalCardRepository.findActiveByAccountId(account.id())).thenReturn(Optional.empty());
 
         IssueVirtualCardUseCase useCase =
-                new IssueVirtualCardUseCase(accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+                new IssueVirtualCardUseCase(accountRepository, physicalCardRepository, virtualCardRepository, processorPort, auditService, CLOCK);
 
         NotFoundException ex = Assertions.assertThrows(NotFoundException.class, () -> useCase.issue(account.id()));
         Assertions.assertEquals(ErrorCode.CARD_NOT_FOUND, ex.errorCode());
@@ -101,7 +105,7 @@ class IssueVirtualCardUseCaseTest {
         when(physicalCardRepository.findActiveByAccountId(accountId)).thenReturn(Optional.of(physicalCard));
 
         IssueVirtualCardUseCase useCase = new IssueVirtualCardUseCase(
-                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, auditService, CLOCK);
 
         ConflictException ex = Assertions.assertThrows(ConflictException.class, () -> useCase.issue(accountId));
         Assertions.assertEquals(ErrorCode.PHYSICAL_CARD_NOT_DELIVERED, ex.errorCode());
@@ -119,7 +123,7 @@ class IssueVirtualCardUseCaseTest {
         when(physicalCardRepository.findActiveByAccountId(account.id())).thenReturn(Optional.of(physical));
 
         IssueVirtualCardUseCase useCase = new IssueVirtualCardUseCase(
-                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, auditService, CLOCK);
 
         ConflictException ex = Assertions.assertThrows(ConflictException.class, () -> useCase.issue(account.id()));
         Assertions.assertEquals(ErrorCode.PHYSICAL_CARD_NOT_VALIDATED, ex.errorCode());
@@ -138,7 +142,7 @@ class IssueVirtualCardUseCaseTest {
         when(virtualCardRepository.findActiveByAccountId(account.id())).thenReturn(Optional.of(existing));
 
         IssueVirtualCardUseCase useCase = new IssueVirtualCardUseCase(
-                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, auditService, CLOCK);
 
         ConflictException ex = Assertions.assertThrows(ConflictException.class, () -> useCase.issue(account.id()));
         Assertions.assertEquals(ErrorCode.VIRTUAL_CARD_ALREADY_EXISTS, ex.errorCode());
@@ -159,7 +163,7 @@ class IssueVirtualCardUseCaseTest {
                 .thenReturn(new ProcessorPort.IssuedVirtualCard(accountId.toString(), "pc_abc", LocalDateTime.of(2026, 1, 31, 12, 15, 0)));
 
         IssueVirtualCardUseCase useCase = new IssueVirtualCardUseCase(
-                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, auditService, CLOCK);
 
         var response = useCase.issue(accountId);
 

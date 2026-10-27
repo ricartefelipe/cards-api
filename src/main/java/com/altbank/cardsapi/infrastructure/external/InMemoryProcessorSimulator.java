@@ -4,6 +4,7 @@ import jakarta.inject.Inject;
 import com.altbank.cardsapi.application.exception.ErrorCode;
 import com.altbank.cardsapi.application.exception.NotFoundException;
 import com.altbank.cardsapi.application.port.ProcessorPort;
+import io.quarkus.arc.profile.UnlessBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.security.SecureRandom;
@@ -15,7 +16,13 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Simulador de processadora para dev/test e demonstracao sintetica.
+ * Restrito a perfis diferentes de "prod": em producao o bean nao existe e o
+ * fail-closed de producao (ProductionReadinessGuard) bloqueia a inicializacao.
+ */
 @ApplicationScoped
+@UnlessBuildProfile("prod")
 public class InMemoryProcessorSimulator implements ProcessorPort {
 
     private final long defaultTtlSeconds;

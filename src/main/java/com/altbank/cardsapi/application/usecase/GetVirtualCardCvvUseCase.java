@@ -7,6 +7,7 @@ import com.altbank.cardsapi.application.exception.ForbiddenException;
 import com.altbank.cardsapi.application.exception.NotFoundException;
 import com.altbank.cardsapi.application.port.ProcessorPort;
 import com.altbank.cardsapi.application.port.VirtualCardRepository;
+import com.altbank.cardsapi.application.security.OwnershipPolicy;
 import com.altbank.cardsapi.domain.model.Account;
 import com.altbank.cardsapi.domain.model.VirtualCard;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -18,11 +19,15 @@ public class GetVirtualCardCvvUseCase {
 
     private final VirtualCardRepository virtualCardRepository;
     private final ProcessorPort processorPort;
+    private final OwnershipPolicy ownershipPolicy;
 
     @Inject
-    public GetVirtualCardCvvUseCase(VirtualCardRepository virtualCardRepository, ProcessorPort processorPort) {
+    public GetVirtualCardCvvUseCase(VirtualCardRepository virtualCardRepository,
+                                    ProcessorPort processorPort,
+                                    OwnershipPolicy ownershipPolicy) {
         this.virtualCardRepository = Objects.requireNonNull(virtualCardRepository, "virtualCardRepository");
         this.processorPort = Objects.requireNonNull(processorPort, "processorPort");
+        this.ownershipPolicy = Objects.requireNonNull(ownershipPolicy, "ownershipPolicy");
     }
 
     public CvvResponse get(UUID virtualCardId) {
@@ -30,6 +35,10 @@ public class GetVirtualCardCvvUseCase {
                 .orElseThrow(() -> new NotFoundException(ErrorCode.VIRTUAL_CARD_NOT_FOUND, "Virtual card not found"));
 
         Account account = card.account();
+        if (!ownershipPolicy.canAccess(account)) {
+            // Nao revela a existencia de recurso alheio: mesma resposta de "nao encontrado".
+            throw new NotFoundException(ErrorCode.VIRTUAL_CARD_NOT_FOUND, "Virtual card not found");
+        }
         if (!account.isActive()) {
             throw new ForbiddenException(ErrorCode.ACCOUNT_CANCELLED, "Account is cancelled");
         }

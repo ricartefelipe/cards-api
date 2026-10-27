@@ -43,8 +43,10 @@ public class PhysicalCardsResource {
     }
 
     @GET
-    public List<PhysicalCardResponse> list(@QueryParam("accountId") UUID accountId) {
-        return queryPhysicalCardsUseCase.list(accountId);
+    public List<PhysicalCardResponse> list(@QueryParam("accountId") UUID accountId,
+                                           @QueryParam("page") Integer page,
+                                           @QueryParam("size") Integer size) {
+        return queryPhysicalCardsUseCase.list(accountId, page, size);
     }
 
     @GET

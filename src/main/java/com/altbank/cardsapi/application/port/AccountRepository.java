@@ -8,6 +8,7 @@ import java.util.UUID;
 public interface AccountRepository {
     Optional<Account> findById(UUID accountId);
     Optional<Account> findByCustomerId(UUID customerId);
-    List<Account> listAll();
+    Optional<Account> findBySubject(String subject);
+    List<Account> listAll(int offset, int limit);
     void persist(Account account);
 }

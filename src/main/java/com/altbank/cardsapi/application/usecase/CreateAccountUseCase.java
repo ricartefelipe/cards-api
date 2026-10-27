@@ -1,6 +1,8 @@
 package com.altbank.cardsapi.application.usecase;
 
 import jakarta.inject.Inject;
+import com.altbank.cardsapi.application.audit.AuditAction;
+import com.altbank.cardsapi.application.audit.AuditService;
 import com.altbank.cardsapi.application.dto.CreateAccountRequest;
 import com.altbank.cardsapi.application.dto.CreateAccountResponse;
 import com.altbank.cardsapi.application.exception.ConflictException;
@@ -25,6 +27,7 @@ public class CreateAccountUseCase {
     private final AccountRepository accountRepository;
     private final PhysicalCardRepository physicalCardRepository;
     private final CarrierPort carrierPort;
+    private final AuditService auditService;
     private final Clock clock;
 
     @Inject
@@ -32,11 +35,13 @@ public class CreateAccountUseCase {
                                 AccountRepository accountRepository,
                                 PhysicalCardRepository physicalCardRepository,
                                 CarrierPort carrierPort,
+                                AuditService auditService,
                                 Clock clock) {
         this.customerRepository = Objects.requireNonNull(customerRepository, "customerRepository");
         this.accountRepository = Objects.requireNonNull(accountRepository, "accountRepository");
         this.physicalCardRepository = Objects.requireNonNull(physicalCardRepository, "physicalCardRepository");
         this.carrierPort = Objects.requireNonNull(carrierPort, "carrierPort");
+        this.auditService = Objects.requireNonNull(auditService, "auditService");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -62,6 +67,7 @@ public class CreateAccountUseCase {
                 request.customer().email(),
                 request.customer().phone(),
                 address,
+                request.customer().subject(),
                 clock
         );
         customerRepository.persist(customer);
@@ -80,6 +86,8 @@ public class CreateAccountUseCase {
                 clock
         );
         physicalCardRepository.persist(physicalCard);
+
+        auditService.record(AuditAction.CREATE_ACCOUNT, "account", account.id());
 
         return new CreateAccountResponse(customer.id(), account.id(), physicalCard.id(), physicalCard.trackingId());
     }

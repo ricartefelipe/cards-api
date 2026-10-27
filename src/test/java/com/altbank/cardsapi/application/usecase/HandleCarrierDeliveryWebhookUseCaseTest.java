@@ -5,6 +5,7 @@ import com.altbank.cardsapi.application.dto.WebhookAckResponse;
 import com.altbank.cardsapi.application.exception.ErrorCode;
 import com.altbank.cardsapi.application.exception.NotFoundException;
 import com.altbank.cardsapi.application.port.PhysicalCardRepository;
+import com.altbank.cardsapi.application.port.WebhookEventRepository;
 import com.altbank.cardsapi.domain.model.Account;
 import com.altbank.cardsapi.domain.model.DeliveryStatus;
 import com.altbank.cardsapi.domain.model.PhysicalCard;
@@ -19,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static com.altbank.cardsapi.CardsTestFixtures.CLOCK;
 import static com.altbank.cardsapi.CardsTestFixtures.activeAccount;
 import static com.altbank.cardsapi.CardsTestFixtures.activePhysicalUndelivered;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,16 +29,21 @@ class HandleCarrierDeliveryWebhookUseCaseTest {
     @Mock
     PhysicalCardRepository physicalCardRepository;
 
+    @Mock
+    WebhookEventRepository webhookEventRepository;
+
+    private HandleCarrierDeliveryWebhookUseCase useCase() {
+        return new HandleCarrierDeliveryWebhookUseCase(physicalCardRepository, webhookEventRepository, CLOCK);
+    }
+
     @Test
     void handle_whenUnknownTracking_shouldFail() {
         when(physicalCardRepository.findByTrackingId("missing")).thenReturn(Optional.empty());
 
-        HandleCarrierDeliveryWebhookUseCase useCase = new HandleCarrierDeliveryWebhookUseCase(physicalCardRepository, CLOCK);
-
         CarrierDeliveryWebhookRequest req = new CarrierDeliveryWebhookRequest(
                 "missing", "DELIVERED", LocalDateTime.of(2026, 2, 1, 10, 0), null, null);
 
-        NotFoundException ex = Assertions.assertThrows(NotFoundException.class, () -> useCase.handle(req));
+        NotFoundException ex = Assertions.assertThrows(NotFoundException.class, () -> useCase().handle(req));
         Assertions.assertEquals(ErrorCode.CARD_NOT_FOUND, ex.errorCode());
     }
 
@@ -44,22 +51,56 @@ class HandleCarrierDeliveryWebhookUseCaseTest {
     void handle_shouldUpdateCarrierState() {
         Account account = activeAccount();
         PhysicalCard physical = activePhysicalUndelivered(account);
-
         when(physicalCardRepository.findByTrackingId(physical.trackingId())).thenReturn(Optional.of(physical));
-
-        HandleCarrierDeliveryWebhookUseCase useCase = new HandleCarrierDeliveryWebhookUseCase(physicalCardRepository, CLOCK);
+        when(webhookEventRepository.recordIfAbsent(any(), any())).thenReturn(true);
 
         CarrierDeliveryWebhookRequest req = new CarrierDeliveryWebhookRequest(
-                physical.trackingId(),
-                "DELIVERED",
-                LocalDateTime.of(2026, 2, 1, 11, 0),
-                null,
-                "addr");
+                physical.trackingId(), "DELIVERED", LocalDateTime.of(2026, 2, 1, 11, 0), null, "addr");
 
-        WebhookAckResponse ack = useCase.handle(req);
+        WebhookAckResponse ack = useCase().handle(req);
 
         Assertions.assertEquals("OK", ack.status());
         Assertions.assertEquals(DeliveryStatus.DELIVERED, physical.deliveryStatus());
         Assertions.assertNotNull(physical.deliveredAt());
+    }
+
+    @Test
+    void handle_whenOlderOutOfOrderEvent_shouldNotRegressState() {
+        Account account = activeAccount();
+        PhysicalCard physical = activePhysicalUndelivered(account);
+        when(physicalCardRepository.findByTrackingId(physical.trackingId())).thenReturn(Optional.of(physical));
+        // Eventos distintos: ambos novos para o dedupe; a guarda de ordem e que ignora o antigo.
+        when(webhookEventRepository.recordIfAbsent(any(), any())).thenReturn(true);
+
+        useCase().handle(new CarrierDeliveryWebhookRequest(
+                physical.trackingId(), "DELIVERED", LocalDateTime.of(2026, 2, 1, 11, 0), null, "addr"));
+        LocalDateTime deliveredAt = physical.deliveredAt();
+
+        WebhookAckResponse ack = useCase().handle(new CarrierDeliveryWebhookRequest(
+                physical.trackingId(), "IN_TRANSIT", LocalDateTime.of(2026, 2, 1, 9, 0), null, "addr"));
+
+        Assertions.assertEquals("OK", ack.status());
+        Assertions.assertEquals(DeliveryStatus.DELIVERED, physical.deliveryStatus());
+        Assertions.assertEquals(deliveredAt, physical.deliveredAt());
+    }
+
+    @Test
+    void handle_whenDuplicateEventPersisted_isIdempotentNoOp() {
+        Account account = activeAccount();
+        PhysicalCard physical = activePhysicalUndelivered(account);
+        when(physicalCardRepository.findByTrackingId(physical.trackingId())).thenReturn(Optional.of(physical));
+        // Mesmo evento: primeiro novo, segundo ja registrado (dedupe duravel) => no-op.
+        when(webhookEventRepository.recordIfAbsent(any(), any())).thenReturn(true, false);
+
+        CarrierDeliveryWebhookRequest delivered = new CarrierDeliveryWebhookRequest(
+                physical.trackingId(), "DELIVERED", LocalDateTime.of(2026, 2, 1, 11, 0), null, "addr");
+
+        useCase().handle(delivered);
+        LocalDateTime deliveredAt = physical.deliveredAt();
+        WebhookAckResponse ack = useCase().handle(delivered);
+
+        Assertions.assertEquals("OK", ack.status());
+        Assertions.assertEquals(DeliveryStatus.DELIVERED, physical.deliveryStatus());
+        Assertions.assertEquals(deliveredAt, physical.deliveredAt());
     }
 }

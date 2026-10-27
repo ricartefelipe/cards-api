@@ -1,5 +1,6 @@
 package com.altbank.cardsapi.application.usecase;
 
+import com.altbank.cardsapi.application.audit.AuditService;
 import com.altbank.cardsapi.application.dto.CancelAccountResponse;
 import com.altbank.cardsapi.application.exception.ErrorCode;
 import com.altbank.cardsapi.application.exception.NotFoundException;
@@ -34,6 +35,8 @@ class CancelAccountUseCaseTest {
     VirtualCardRepository virtualCardRepository;
     @Mock
     ProcessorPort processorPort;
+    @Mock
+    AuditService auditService;
 
     @Test
     void cancel_whenAccountMissing_shouldFail() {
@@ -41,7 +44,7 @@ class CancelAccountUseCaseTest {
         when(accountRepository.findById(id)).thenReturn(Optional.empty());
 
         CancelAccountUseCase useCase = new CancelAccountUseCase(
-                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, auditService, CLOCK);
 
         NotFoundException ex = Assertions.assertThrows(NotFoundException.class, () -> useCase.cancel(id));
         Assertions.assertEquals(ErrorCode.ACCOUNT_NOT_FOUND, ex.errorCode());
@@ -60,7 +63,7 @@ class CancelAccountUseCaseTest {
         when(virtualCardRepository.findActiveByAccountId(accountId)).thenReturn(Optional.of(virt));
 
         CancelAccountUseCase useCase = new CancelAccountUseCase(
-                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, auditService, CLOCK);
 
         CancelAccountResponse response = useCase.cancel(accountId);
 
@@ -82,7 +85,7 @@ class CancelAccountUseCaseTest {
         when(virtualCardRepository.findActiveByAccountId(accountId)).thenReturn(Optional.empty());
 
         CancelAccountUseCase useCase = new CancelAccountUseCase(
-                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, CLOCK);
+                accountRepository, physicalCardRepository, virtualCardRepository, processorPort, auditService, CLOCK);
 
         CancelAccountResponse response = useCase.cancel(accountId);
 

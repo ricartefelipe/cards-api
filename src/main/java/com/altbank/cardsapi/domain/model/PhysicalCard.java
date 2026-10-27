@@ -49,7 +49,7 @@ public class PhysicalCard extends Card {
     @Column(name = "reissue_reason", length = 24)
     private ReissueReason reissueReason;
 
-    @Column(name = "previous_physical_card_id", length = 36)
+    @Column(name = "previous_physical_card_id", length = 36, unique = true)
     private String previousPhysicalCardId;
 
     protected PhysicalCard() {
@@ -119,18 +119,47 @@ public class PhysicalCard extends Card {
         return validatedAt != null;
     }
 
+    /**
+     * Aplica um evento de entrega da transportadora. Ignora eventos estale (data igual ou
+     * anterior a ultima registrada, ou sem data quando ja existe uma) e eventos que
+     * regrediriam um estado terminal (DELIVERED/RETURNED) para um nao-terminal. Assim,
+     * eventos fora de ordem ou repetidos nao regridem o estado (idempotente a reenvio).
+     */
     public void applyCarrierDeliveryUpdate(DeliveryStatus newStatus,
                                           LocalDateTime deliveryDate,
                                           String returnReason,
                                           String deliveryAddress,
                                           Clock clock) {
-        this.deliveryStatus = Objects.requireNonNull(newStatus, "newStatus");
+        Objects.requireNonNull(newStatus, "newStatus");
+        if (isStaleDeliveryEvent(deliveryDate) || regressesTerminalState(newStatus)) {
+            return;
+        }
+        this.deliveryStatus = newStatus;
         this.deliveryDate = deliveryDate;
         this.deliveryReturnReason = normalizeOptional(returnReason);
         this.deliveryAddress = normalizeOptional(deliveryAddress);
-        if (newStatus == DeliveryStatus.DELIVERED) {
+        if (newStatus == DeliveryStatus.DELIVERED && this.deliveredAt == null) {
             this.deliveredAt = deliveryDate != null ? deliveryDate : LocalDateTime.now(Objects.requireNonNull(clock, "clock"));
         }
+    }
+
+    private boolean isStaleDeliveryEvent(LocalDateTime incoming) {
+        if (this.deliveryDate == null) {
+            return false;
+        }
+        if (incoming == null) {
+            return true;
+        }
+        return !incoming.isAfter(this.deliveryDate);
+    }
+
+    private boolean regressesTerminalState(DeliveryStatus incoming) {
+        boolean currentlyTerminal = isTerminal(this.deliveryStatus);
+        return currentlyTerminal && !isTerminal(incoming);
+    }
+
+    private static boolean isTerminal(DeliveryStatus status) {
+        return status == DeliveryStatus.DELIVERED || status == DeliveryStatus.RETURNED;
     }
 
     public void validate(Clock clock) {

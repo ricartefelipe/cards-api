@@ -6,6 +6,7 @@ import com.altbank.cardsapi.application.exception.ErrorCode;
 import com.altbank.cardsapi.application.exception.ForbiddenException;
 import com.altbank.cardsapi.application.exception.NotFoundException;
 import com.altbank.cardsapi.application.port.PhysicalCardRepository;
+import com.altbank.cardsapi.application.security.OwnershipPolicy;
 import com.altbank.cardsapi.domain.model.Account;
 import com.altbank.cardsapi.domain.model.PhysicalCard;
 import java.util.Optional;
@@ -17,9 +18,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static com.altbank.cardsapi.CardsTestFixtures.CLOCK;
+import static com.altbank.cardsapi.CardsTestFixtures.accountOwnedBy;
 import static com.altbank.cardsapi.CardsTestFixtures.activeAccount;
 import static com.altbank.cardsapi.CardsTestFixtures.activePhysicalDeliveredNotValidated;
 import static com.altbank.cardsapi.CardsTestFixtures.activePhysicalUndelivered;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,15 +31,32 @@ class ValidatePhysicalCardUseCaseTest {
     @Mock
     PhysicalCardRepository physicalCardRepository;
 
+    @Mock
+    OwnershipPolicy ownershipPolicy;
+
+    private ValidatePhysicalCardUseCase useCase() {
+        return new ValidatePhysicalCardUseCase(physicalCardRepository, ownershipPolicy, CLOCK);
+    }
+
     @Test
     void validate_whenMissing_shouldFail() {
         UUID id = UUID.randomUUID();
         when(physicalCardRepository.findById(id)).thenReturn(Optional.empty());
 
-        ValidatePhysicalCardUseCase useCase = new ValidatePhysicalCardUseCase(physicalCardRepository, CLOCK);
-
-        NotFoundException ex = Assertions.assertThrows(NotFoundException.class, () -> useCase.validate(id));
+        NotFoundException ex = Assertions.assertThrows(NotFoundException.class, () -> useCase().validate(id));
         Assertions.assertEquals(ErrorCode.CARD_NOT_FOUND, ex.errorCode());
+    }
+
+    @Test
+    void validate_whenCallerIsNotOwner_shouldFailAsNotFound() {
+        Account account = accountOwnedBy("owner-b");
+        PhysicalCard card = activePhysicalDeliveredNotValidated(account);
+        when(physicalCardRepository.findById(card.id())).thenReturn(Optional.of(card));
+        when(ownershipPolicy.canAccess(account)).thenReturn(false);
+
+        NotFoundException ex = Assertions.assertThrows(NotFoundException.class, () -> useCase().validate(card.id()));
+        Assertions.assertEquals(ErrorCode.CARD_NOT_FOUND, ex.errorCode());
+        Assertions.assertNull(card.validatedAt());
     }
 
     @Test
@@ -45,10 +65,9 @@ class ValidatePhysicalCardUseCaseTest {
         PhysicalCard card = activePhysicalUndelivered(account);
 
         when(physicalCardRepository.findById(card.id())).thenReturn(Optional.of(card));
+        when(ownershipPolicy.canAccess(any())).thenReturn(true);
 
-        ValidatePhysicalCardUseCase useCase = new ValidatePhysicalCardUseCase(physicalCardRepository, CLOCK);
-
-        ConflictException ex = Assertions.assertThrows(ConflictException.class, () -> useCase.validate(card.id()));
+        ConflictException ex = Assertions.assertThrows(ConflictException.class, () -> useCase().validate(card.id()));
         Assertions.assertEquals(ErrorCode.PHYSICAL_CARD_NOT_DELIVERED, ex.errorCode());
     }
 
@@ -59,10 +78,9 @@ class ValidatePhysicalCardUseCaseTest {
         account.cancel(CLOCK);
 
         when(physicalCardRepository.findById(card.id())).thenReturn(Optional.of(card));
+        when(ownershipPolicy.canAccess(any())).thenReturn(true);
 
-        ValidatePhysicalCardUseCase useCase = new ValidatePhysicalCardUseCase(physicalCardRepository, CLOCK);
-
-        ForbiddenException ex = Assertions.assertThrows(ForbiddenException.class, () -> useCase.validate(card.id()));
+        ForbiddenException ex = Assertions.assertThrows(ForbiddenException.class, () -> useCase().validate(card.id()));
         Assertions.assertEquals(ErrorCode.ACCOUNT_CANCELLED, ex.errorCode());
     }
 
@@ -73,10 +91,9 @@ class ValidatePhysicalCardUseCaseTest {
         card.deactivate(CLOCK);
 
         when(physicalCardRepository.findById(card.id())).thenReturn(Optional.of(card));
+        when(ownershipPolicy.canAccess(any())).thenReturn(true);
 
-        ValidatePhysicalCardUseCase useCase = new ValidatePhysicalCardUseCase(physicalCardRepository, CLOCK);
-
-        ForbiddenException ex = Assertions.assertThrows(ForbiddenException.class, () -> useCase.validate(card.id()));
+        ForbiddenException ex = Assertions.assertThrows(ForbiddenException.class, () -> useCase().validate(card.id()));
         Assertions.assertEquals(ErrorCode.CARD_INACTIVE, ex.errorCode());
     }
 
@@ -86,13 +103,12 @@ class ValidatePhysicalCardUseCaseTest {
         PhysicalCard card = activePhysicalDeliveredNotValidated(account);
 
         when(physicalCardRepository.findById(card.id())).thenReturn(Optional.of(card));
+        when(ownershipPolicy.canAccess(any())).thenReturn(true);
 
-        ValidatePhysicalCardUseCase useCase = new ValidatePhysicalCardUseCase(physicalCardRepository, CLOCK);
-
-        ValidatePhysicalCardResponse r1 = useCase.validate(card.id());
+        ValidatePhysicalCardResponse r1 = useCase().validate(card.id());
         Assertions.assertNotNull(r1.validatedAt());
 
-        ValidatePhysicalCardResponse r2 = useCase.validate(card.id());
+        ValidatePhysicalCardResponse r2 = useCase().validate(card.id());
         Assertions.assertEquals(r1.validatedAt(), r2.validatedAt());
     }
 }

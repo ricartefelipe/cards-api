@@ -39,6 +39,9 @@ public class Customer {
     @Column(name = "phone", length = 40)
     private String phone;
 
+    @Column(name = "subject", length = 64)
+    private String subject;
+
     @Embedded
     private Address address;
 
@@ -49,12 +52,17 @@ public class Customer {
     }
 
     public Customer(String fullName, String document, String email, String phone, Address address, Clock clock) {
+        this(fullName, document, email, phone, address, null, clock);
+    }
+
+    public Customer(String fullName, String document, String email, String phone, Address address, String subject, Clock clock) {
         this.id = UUID.randomUUID();
         this.fullName = requireNonBlank(fullName, "fullName");
         this.document = requireNonBlank(document, "document");
         this.email = requireNonBlank(email, "email");
         this.phone = normalizeOptional(phone);
         this.address = Objects.requireNonNull(address, "address");
+        this.subject = normalizeOptional(subject);
         this.createdAt = LocalDateTime.now(Objects.requireNonNull(clock, "clock"));
     }
 
@@ -76,6 +84,10 @@ public class Customer {
 
     public String phone() {
         return phone;
+    }
+
+    public String subject() {
+        return subject;
     }
 
     public Address address() {
