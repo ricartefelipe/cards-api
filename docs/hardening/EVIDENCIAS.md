@@ -11,8 +11,8 @@
 
 | Gate | Comando | Resultado |
 |------|---------|-----------|
-| Build + testes unitários | `mvn -ntp test` | **BUILD SUCCESS — 78 testes, 0 falhas/erros** (grupo `integration` excluído) |
-| Teste de integração HTTP | `mvn test -Dgroups=integration -DexcludedGroups=` | **compila**; execução **bloqueada no sandbox** (Testcontainers nao alcança o daemon Docker da JVM de teste); roda na CI |
+| Build + testes unitários | `mvn -ntp -B clean verify` | **BUILD SUCCESS — 83 testes, 0 falhas/erros** (grupo `integration` excluído) |
+| Teste de integração HTTP (banco real) | `mvn -ntp -B test -Dgroups=integration -Dsurefire.excluded.groups=` | **BUILD SUCCESS — 6 testes, 0 falhas** (MariaDB dos Dev Services). O comando antigo (`-DexcludedGroups=`) executava **zero** testes |
 | Augmentação/empacotamento prod (wiring) | `mvn -ntp -DskipTests -Dquarkus.profile=prod package` | **exit 0** (beans fail-closed de prod resolvem injeção) |
 | Lint YAML workflows | `python3 -c "yaml.safe_load(...)"` | ok |
 | Whitespace do diff | `git diff --check` | sem erros |
@@ -28,7 +28,18 @@
 - Bases fixadas por digest de índice multi-arch:
   - `maven:3.9.6-eclipse-temurin-21` → `sha256:8d63d4c1902cb12d9e79a70671b18ebe26358cb592561af33ca1808f00d935cb`
   - `eclipse-temurin:21-jre` → `sha256:ff92a063dac03a29fca3987bcfc66aa5f17769542df802bbf7d2ebaba4df8ebe`
-- Scan de CVEs da imagem: **pendência local** (scanner não executado nesta sessão; recomendado em CI contra os digests acima).
+- Scan de CVEs da imagem: **executado** com trivy (`--severity HIGH,CRITICAL --scanners vuln`,
+  sem `ignore-unfixed`) em 2026-10-29.
+  - Imagem anterior (Quarkus 3.8.3): **33 HIGH + 1 CRITICAL**, todos em JARs da aplicação
+    (`lang-pkgs`) e **todos com correção disponível** — jackson-core/databind 2.16.1, netty
+    4.1.107.Final (inclui o CRITICAL CVE-2026-75595 em netty-handler), jose4j 0.9.3,
+    quarkus-core e quarkus-vertx-http 3.8.3. A base Ubuntu 26.04 não contribuiu com nenhum achado.
+  - Os CVEs de `quarkus-vertx-http` não têm correção na linha 3.8, o que exigiu subir a
+    plataforma para **3.40.1.1** (e renomear `quarkus-resteasy-reactive-jackson` →
+    `quarkus-rest-jackson` e `quarkus-junit5` → `quarkus-junit`).
+  - Imagem final após a correção: **0 HIGH, 0 CRITICAL** (`trivy --exit-code 1` devolve 0).
+  - O gate passou a ser **bloqueante** na CI (job `image-scan`): mesma imagem da entrega, mesmo
+    Dockerfile, `exit-code: '1'`, sem `continue-on-error`, sem `ignore-unfixed` e sem exclusões.
 
 ## Cobertura de testes nova (cenários de segurança)
 
