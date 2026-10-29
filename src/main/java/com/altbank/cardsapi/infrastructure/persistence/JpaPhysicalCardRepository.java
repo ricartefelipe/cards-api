@@ -1,6 +1,8 @@
 package com.altbank.cardsapi.infrastructure.persistence;
 
 import jakarta.inject.Inject;
+import com.altbank.cardsapi.application.exception.ConflictException;
+import com.altbank.cardsapi.application.exception.ErrorCode;
 import com.altbank.cardsapi.application.port.PhysicalCardRepository;
 import com.altbank.cardsapi.domain.model.CardStatus;
 import com.altbank.cardsapi.domain.model.PhysicalCard;
@@ -13,6 +15,9 @@ import java.util.UUID;
 
 @ApplicationScoped
 public class JpaPhysicalCardRepository implements PhysicalCardRepository {
+
+    /** Restricao que deixa um cartao ser predecessor de um unico outro (V6__reissue_idempotency). */
+    private static final String UNIQUE_PREVIOUS = "uk_physical_cards_previous";
 
     private final EntityManager entityManager;
 
@@ -71,5 +76,11 @@ public class JpaPhysicalCardRepository implements PhysicalCardRepository {
     @Override
     public void persist(PhysicalCard physicalCard) {
         entityManager.persist(physicalCard);
+        UniqueConflicts.flushTranslating(
+                entityManager,
+                UNIQUE_PREVIOUS,
+                () -> new ConflictException(
+                        ErrorCode.PHYSICAL_CARD_ALREADY_REISSUED,
+                        "Physical card has already been reissued"));
     }
 }

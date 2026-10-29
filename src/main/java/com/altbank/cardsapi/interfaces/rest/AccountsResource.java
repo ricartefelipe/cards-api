@@ -31,7 +31,6 @@ import java.util.UUID;
 @ApplicationScoped
 @RolesAllowed("admin")
 @Path("/accounts")
-@Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class AccountsResource {
 
@@ -64,6 +63,7 @@ public class AccountsResource {
     }
 
     @POST
+    @Consumes(MediaType.APPLICATION_JSON)
     public Response create(@Valid CreateAccountRequest request) {
         CreateAccountResponse response = createAccountUseCase.create(request);
         return Response.created(URI.create("/accounts/" + response.accountId()))
