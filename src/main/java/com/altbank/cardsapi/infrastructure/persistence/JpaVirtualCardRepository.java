@@ -1,6 +1,8 @@
 package com.altbank.cardsapi.infrastructure.persistence;
 
 import jakarta.inject.Inject;
+import com.altbank.cardsapi.application.exception.ConflictException;
+import com.altbank.cardsapi.application.exception.ErrorCode;
 import com.altbank.cardsapi.application.port.VirtualCardRepository;
 import com.altbank.cardsapi.domain.model.CardStatus;
 import com.altbank.cardsapi.domain.model.VirtualCard;
@@ -13,6 +15,9 @@ import java.util.UUID;
 
 @ApplicationScoped
 public class JpaVirtualCardRepository implements VirtualCardRepository {
+
+    /** Restricao que deixa um cartao ser predecessor de um unico outro (V6__reissue_idempotency). */
+    private static final String UNIQUE_PREVIOUS = "uk_virtual_cards_previous";
 
     private final EntityManager entityManager;
 
@@ -71,5 +76,11 @@ public class JpaVirtualCardRepository implements VirtualCardRepository {
     @Override
     public void persist(VirtualCard virtualCard) {
         entityManager.persist(virtualCard);
+        UniqueConflicts.flushTranslating(
+                entityManager,
+                UNIQUE_PREVIOUS,
+                () -> new ConflictException(
+                        ErrorCode.VIRTUAL_CARD_ALREADY_REISSUED,
+                        "Virtual card has already been reissued"));
     }
 }

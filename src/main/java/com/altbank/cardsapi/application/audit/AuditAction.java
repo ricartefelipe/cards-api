@@ -6,5 +6,9 @@ package com.altbank.cardsapi.application.audit;
 public enum AuditAction {
     CREATE_ACCOUNT,
     CANCEL_ACCOUNT,
-    ISSUE_VIRTUAL_CARD
+    ISSUE_VIRTUAL_CARD,
+    SHIPMENT_REQUESTED,
+    SHIPMENT_CONFIRMED,
+    SHIPMENT_REJECTED,
+    SHIPMENT_UNCERTAIN
 }

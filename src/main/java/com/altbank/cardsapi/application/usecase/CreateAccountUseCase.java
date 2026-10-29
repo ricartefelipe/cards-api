@@ -8,7 +8,8 @@ import com.altbank.cardsapi.application.dto.CreateAccountResponse;
 import com.altbank.cardsapi.application.exception.ConflictException;
 import com.altbank.cardsapi.application.exception.ErrorCode;
 import com.altbank.cardsapi.application.port.AccountRepository;
-import com.altbank.cardsapi.application.port.CarrierPort;
+import com.altbank.cardsapi.application.port.TransactionRunner;
+import com.altbank.cardsapi.application.shipping.ShipmentOrchestrator;
 import com.altbank.cardsapi.application.port.CustomerRepository;
 import com.altbank.cardsapi.application.port.PhysicalCardRepository;
 import com.altbank.cardsapi.domain.model.Account;
@@ -16,17 +17,20 @@ import com.altbank.cardsapi.domain.model.Address;
 import com.altbank.cardsapi.domain.model.Customer;
 import com.altbank.cardsapi.domain.model.PhysicalCard;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.transaction.Transactional;
 import java.time.Clock;
 import java.util.Objects;
+import java.util.UUID;
 
 @ApplicationScoped
 public class CreateAccountUseCase {
 
+    static final String ACTOR = "account-create";
+
     private final CustomerRepository customerRepository;
     private final AccountRepository accountRepository;
     private final PhysicalCardRepository physicalCardRepository;
-    private final CarrierPort carrierPort;
+    private final ShipmentOrchestrator shipments;
+    private final TransactionRunner tx;
     private final AuditService auditService;
     private final Clock clock;
 
@@ -34,19 +38,33 @@ public class CreateAccountUseCase {
     public CreateAccountUseCase(CustomerRepository customerRepository,
                                 AccountRepository accountRepository,
                                 PhysicalCardRepository physicalCardRepository,
-                                CarrierPort carrierPort,
+                                ShipmentOrchestrator shipments,
+                                TransactionRunner tx,
                                 AuditService auditService,
                                 Clock clock) {
         this.customerRepository = Objects.requireNonNull(customerRepository, "customerRepository");
         this.accountRepository = Objects.requireNonNull(accountRepository, "accountRepository");
         this.physicalCardRepository = Objects.requireNonNull(physicalCardRepository, "physicalCardRepository");
-        this.carrierPort = Objects.requireNonNull(carrierPort, "carrierPort");
+        this.shipments = Objects.requireNonNull(shipments, "shipments");
+        this.tx = Objects.requireNonNull(tx, "tx");
         this.auditService = Objects.requireNonNull(auditService, "auditService");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    @Transactional
+    private record Created(UUID customerId, UUID accountId, UUID cardId, UUID shipmentRequestId) {
+    }
+
+    // A intencao de remessa e gravada junto com o cartao; a chamada a transportadora vem depois
+    // da transacao, para que uma falha dela nao desfaca a conta nem fique sem registro.
     public CreateAccountResponse create(CreateAccountRequest request) {
+        Created created = tx.inTransaction(() -> persist(request));
+        ShipmentOrchestrator.Dispatch dispatch = shipments.dispatch(created.shipmentRequestId(), ACTOR);
+        return new CreateAccountResponse(
+                created.customerId(), created.accountId(), created.cardId(),
+                dispatch.trackingId().orElse(null), dispatch.status().name());
+    }
+
+    private Created persist(CreateAccountRequest request) {
         String document = request.customer().document().trim();
         customerRepository.findByDocument(document).ifPresent(existing -> {
             throw new ConflictException(ErrorCode.CUSTOMER_ALREADY_EXISTS, "Customer already exists for document");
@@ -75,20 +93,13 @@ public class CreateAccountUseCase {
         Account account = new Account(customer, clock);
         accountRepository.persist(account);
 
-        CarrierPort.CarrierShipment shipment = carrierPort.createShipment(customer.address().asSingleLine());
-        PhysicalCard physicalCard = new PhysicalCard(
-                account,
-                shipment.trackingId(),
-                shipment.initialStatus(),
-                customer.address().asSingleLine(),
-                null,
-                null,
-                clock
-        );
+        String deliveryAddress = customer.address().asSingleLine();
+        PhysicalCard physicalCard = new PhysicalCard(account, deliveryAddress, null, null, clock);
         physicalCardRepository.persist(physicalCard);
+        UUID shipmentRequestId = shipments.requestShipment(physicalCard, deliveryAddress, ACTOR);
 
         auditService.record(AuditAction.CREATE_ACCOUNT, "account", account.id());
 
-        return new CreateAccountResponse(customer.id(), account.id(), physicalCard.id(), physicalCard.trackingId());
+        return new Created(customer.id(), account.id(), physicalCard.id(), shipmentRequestId);
     }
 }

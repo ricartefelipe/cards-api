@@ -23,7 +23,7 @@ import static com.altbank.cardsapi.domain.model.support.Strings.requireNonBlank;
 @Access(AccessType.FIELD)
 public class PhysicalCard extends Card {
 
-    @Column(name = "tracking_id", length = 64, nullable = false, unique = true)
+    @Column(name = "tracking_id", length = 64, unique = true)
     private String trackingId;
 
     @Enumerated(EnumType.STRING)
@@ -68,6 +68,32 @@ public class PhysicalCard extends Card {
         this.deliveryAddress = normalizeOptional(deliveryAddressSnapshot);
         this.reissueReason = reissueReason;
         this.previousPhysicalCardId = previousCard == null ? null : previousCard.id().toString();
+    }
+
+    /** Cartao criado antes da remessa: sem tracking ate a transportadora responder. */
+    public PhysicalCard(Account account,
+                        String deliveryAddressSnapshot,
+                        ReissueReason reissueReason,
+                        PhysicalCard previousCard,
+                        Clock clock) {
+        super(account, clock);
+        this.deliveryStatus = DeliveryStatus.PENDING;
+        this.deliveryAddress = normalizeOptional(deliveryAddressSnapshot);
+        this.reissueReason = reissueReason;
+        this.previousPhysicalCardId = previousCard == null ? null : previousCard.id().toString();
+    }
+
+    /** A transportadora aceitou: o cartao recebe o tracking e o estado inicial da entrega. */
+    public void shipped(String trackingId, DeliveryStatus initialStatus) {
+        if (this.trackingId != null) {
+            throw new IllegalStateException("card " + id() + " already has a shipment");
+        }
+        this.trackingId = requireNonBlank(trackingId, "trackingId");
+        this.deliveryStatus = Objects.requireNonNull(initialStatus, "initialStatus");
+    }
+
+    public boolean awaitsShipment() {
+        return trackingId == null;
     }
 
     public String trackingId() {

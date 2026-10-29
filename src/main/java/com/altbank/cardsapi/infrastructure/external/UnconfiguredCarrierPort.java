@@ -14,7 +14,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 public class UnconfiguredCarrierPort implements CarrierPort {
 
     @Override
-    public CarrierShipment createShipment(String deliveryAddress) {
+    public ShipmentOutcome createShipment(ShipmentOrder order) {
         throw new IllegalStateException(
                 "Transportadora nao configurada: nenhum adaptador real contratado esta ativo em producao.");
     }

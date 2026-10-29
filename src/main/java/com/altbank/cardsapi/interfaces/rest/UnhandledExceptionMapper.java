@@ -1,6 +1,7 @@
 package com.altbank.cardsapi.interfaces.rest;
 
 import jakarta.inject.Inject;
+import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -44,6 +45,23 @@ public class UnhandledExceptionMapper implements ExceptionMapper<Exception> {
                     .entity(body)
                     .build();
         }
+        if (exception instanceof WebApplicationException protocolFailure) {
+            // Metodo, content-type ou rota invalidos: o status da propria excecao e a resposta
+            // correta. Devolver 500 esconderia um pedido mal formado atras de uma falha do servidor.
+            int status = protocolFailure.getResponse().getStatus();
+            ErrorResponse body = new ErrorResponse(
+                    reasonCode(status),
+                    reasonPhrase(status),
+                    status,
+                    path,
+                    LocalDateTime.now(clock),
+                    null
+            );
+            return Response.status(status)
+                    .type(MediaType.APPLICATION_JSON)
+                    .entity(body)
+                    .build();
+        }
         LOG.error("Unhandled exception", exception);
         ErrorResponse body = new ErrorResponse(
                 "INTERNAL_ERROR",
@@ -57,5 +75,15 @@ public class UnhandledExceptionMapper implements ExceptionMapper<Exception> {
                 .type(MediaType.APPLICATION_JSON)
                 .entity(body)
                 .build();
+    }
+
+    private static String reasonCode(int status) {
+        Response.Status known = Response.Status.fromStatusCode(status);
+        return known == null ? "HTTP_" + status : known.name();
+    }
+
+    private static String reasonPhrase(int status) {
+        Response.Status known = Response.Status.fromStatusCode(status);
+        return known == null ? "Request failed" : known.getReasonPhrase();
     }
 }
