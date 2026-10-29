@@ -5,11 +5,13 @@ import com.altbank.cardsapi.application.dto.ReissuePhysicalCardResponse;
 import com.altbank.cardsapi.application.exception.ErrorCode;
 import com.altbank.cardsapi.application.exception.ForbiddenException;
 import com.altbank.cardsapi.application.exception.NotFoundException;
-import com.altbank.cardsapi.application.port.CarrierPort;
+import com.altbank.cardsapi.application.port.TransactionRunner;
+import com.altbank.cardsapi.application.shipping.ShipmentOrchestrator;
+import com.altbank.cardsapi.domain.model.ShipmentStatus;
+import java.util.function.Supplier;
 import com.altbank.cardsapi.application.port.PhysicalCardRepository;
 import com.altbank.cardsapi.application.security.OwnershipPolicy;
 import com.altbank.cardsapi.domain.model.Account;
-import com.altbank.cardsapi.domain.model.DeliveryStatus;
 import com.altbank.cardsapi.domain.model.PhysicalCard;
 import com.altbank.cardsapi.domain.model.ReissueReason;
 import java.util.Optional;
@@ -38,7 +40,14 @@ class ReissuePhysicalCardUseCaseTest {
     PhysicalCardRepository physicalCardRepository;
 
     @Mock
-    CarrierPort carrierPort;
+    ShipmentOrchestrator shipments;
+
+    static final TransactionRunner INLINE = new TransactionRunner() {
+        @Override
+        public <T> T inTransaction(Supplier<T> work) {
+            return work.get();
+        }
+    };
 
     @Mock
     OwnershipPolicy ownershipPolicy;
@@ -48,14 +57,14 @@ class ReissuePhysicalCardUseCaseTest {
         UUID id = UUID.randomUUID();
         when(physicalCardRepository.findById(id)).thenReturn(Optional.empty());
 
-        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, carrierPort, ownershipPolicy, CLOCK);
+        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, shipments, INLINE, ownershipPolicy, CLOCK);
 
         NotFoundException ex = Assertions.assertThrows(
                 NotFoundException.class,
                 () -> useCase.reissue(id, new ReissuePhysicalCardRequest(ReissueReason.LOSS)));
 
         Assertions.assertEquals(ErrorCode.CARD_NOT_FOUND, ex.errorCode());
-        verifyNoInteractions(carrierPort);
+        verifyNoInteractions(shipments);
     }
 
     @Test
@@ -67,14 +76,14 @@ class ReissuePhysicalCardUseCaseTest {
         when(physicalCardRepository.findById(card.id())).thenReturn(Optional.of(card));
         when(ownershipPolicy.canAccess(any())).thenReturn(true);
 
-        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, carrierPort, ownershipPolicy, CLOCK);
+        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, shipments, INLINE, ownershipPolicy, CLOCK);
 
         ForbiddenException ex = Assertions.assertThrows(
                 ForbiddenException.class,
                 () -> useCase.reissue(card.id(), new ReissuePhysicalCardRequest(ReissueReason.DAMAGE)));
 
         Assertions.assertEquals(ErrorCode.ACCOUNT_CANCELLED, ex.errorCode());
-        verifyNoInteractions(carrierPort);
+        verifyNoInteractions(shipments);
     }
 
     @Test
@@ -86,14 +95,14 @@ class ReissuePhysicalCardUseCaseTest {
         when(physicalCardRepository.findById(card.id())).thenReturn(Optional.of(card));
         when(ownershipPolicy.canAccess(any())).thenReturn(true);
 
-        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, carrierPort, ownershipPolicy, CLOCK);
+        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, shipments, INLINE, ownershipPolicy, CLOCK);
 
         ForbiddenException ex = Assertions.assertThrows(
                 ForbiddenException.class,
                 () -> useCase.reissue(card.id(), new ReissuePhysicalCardRequest(ReissueReason.THEFT)));
 
         Assertions.assertEquals(ErrorCode.CARD_INACTIVE, ex.errorCode());
-        verify(carrierPort, never()).createShipment(any());
+        verify(shipments, never()).requestShipment(any(), any(), any());
     }
 
     @Test
@@ -103,10 +112,12 @@ class ReissuePhysicalCardUseCaseTest {
 
         when(physicalCardRepository.findById(old.id())).thenReturn(Optional.of(old));
         when(ownershipPolicy.canAccess(any())).thenReturn(true);
-        when(carrierPort.createShipment(any()))
-                .thenReturn(new CarrierPort.CarrierShipment("trk_re", DeliveryStatus.PENDING));
+        java.util.UUID requestId = java.util.UUID.randomUUID();
+        when(shipments.requestShipment(any(PhysicalCard.class), any(), any())).thenReturn(requestId);
+        when(shipments.dispatch(requestId, ReissuePhysicalCardUseCase.ACTOR))
+                .thenReturn(new ShipmentOrchestrator.Dispatch(ShipmentStatus.CONFIRMED, java.util.Optional.of("trk_re")));
 
-        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, carrierPort, ownershipPolicy, CLOCK);
+        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, shipments, INLINE, ownershipPolicy, CLOCK);
 
         ReissuePhysicalCardResponse response =
                 useCase.reissue(old.id(), new ReissuePhysicalCardRequest(ReissueReason.LOSS));
@@ -120,6 +131,8 @@ class ReissuePhysicalCardUseCaseTest {
         Assertions.assertEquals(ReissueReason.LOSS, created.reissueReason());
         Assertions.assertEquals(old.id().toString(), created.previousPhysicalCardId());
         Assertions.assertTrue(created.isActive());
+        Assertions.assertTrue(created.awaitsShipment(), "o tracking so chega pela transportadora");
+        Assertions.assertEquals("CONFIRMED", response.shipmentStatus());
     }
 
     @Test
@@ -129,7 +142,7 @@ class ReissuePhysicalCardUseCaseTest {
         when(physicalCardRepository.findById(old.id())).thenReturn(Optional.of(old));
         when(ownershipPolicy.canAccess(account)).thenReturn(false);
 
-        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, carrierPort, ownershipPolicy, CLOCK);
+        ReissuePhysicalCardUseCase useCase = new ReissuePhysicalCardUseCase(physicalCardRepository, shipments, INLINE, ownershipPolicy, CLOCK);
 
         NotFoundException ex = Assertions.assertThrows(
                 NotFoundException.class,
@@ -137,7 +150,7 @@ class ReissuePhysicalCardUseCaseTest {
 
         Assertions.assertEquals(ErrorCode.CARD_NOT_FOUND, ex.errorCode());
         Assertions.assertTrue(old.isActive());
-        verifyNoInteractions(carrierPort);
+        verifyNoInteractions(shipments);
         verify(physicalCardRepository, never()).persist(any(PhysicalCard.class));
     }
 }

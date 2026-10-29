@@ -2,7 +2,9 @@
 
 Modalidade entregável: **sandbox/kit** (sem processadora/transportadora contratada).
 Branch de trabalho: `feature/melhoria-refactor`. Git/publicação são do proprietário.
-Baseline e final: `mvn test` verde; final = **78 testes** (unitários; integração em grupo à parte). Empacotamento `-Dquarkus.profile=prod package`: exit 0.
+Baseline e final: `mvn test` verde; final = **83 testes** unitários mais **6 de integração com banco real**
+(MariaDB dos Dev Services), todos executados localmente em 2026-10-29. Empacotamento
+`-Dquarkus.profile=prod package`: exit 0.
 
 Legenda de estado: **corrigido** (nesta execução) · **já atendido** · **não aplicável** · **bloqueio externo** · **pendência local**.
 
@@ -50,13 +52,30 @@ Legenda de estado: **corrigido** (nesta execução) · **já atendido** · **nã
 - ✅ **Idempotência persistida de webhooks** — tabela `webhook_events` (V4) + `WebhookEventRepository` + fingerprint (sem CVV); dedupe duravel sobrevive a restart/instancias. Tests: dedupe em carrier e processor.
 - ✅ **Trilha de auditoria** — `audit_logs` (V5) + `AuditService` em criar/cancelar conta e emitir cartao (ator, acao, target, correlation id; sem material sensivel). Tests: `AuditServiceTest`.
 - ✅ **Healthcheck do `cards-api`** no `docker-compose` + `cards-admin` depende de `service_healthy`.
-- ◻️ **Teste de integração HTTP** (@QuarkusTest + MariaDB Dev Services + @TestSecurity/@JwtSecurity) escrito e **compilando** (`CardsFlowIntegrationTest`, grupo `integration`): jornada criar→entregar→validar→emitir→CVV + IDOR (A vs B) + header no-store. **Não executável neste sandbox** (Testcontainers nao alcança o daemon Docker a partir da JVM de teste); **roda na CI** (`ci.yml`, passo dedicado).
+- ✅ **Teste de integração HTTP** (@QuarkusTest + MariaDB Dev Services + @TestSecurity/@JwtSecurity):
+  jornada criar→entregar→validar→emitir→CVV + IDOR (A vs B) + header no-store. **Executado**
+  (`mvn test -Dgroups=integration -Dsurefire.excluded.groups=`): 6 testes, 0 falhas.
+  Duas correções foram necessárias para que ele saísse do papel:
+  1. O passo da CI usava `-DexcludedGroups=`, que **não** sobrepõe o `<excludedGroups>` fixo do
+     POM: o passo executava **zero testes** e passava. A exclusão virou a property
+     `surefire.excluded.groups`, e a CI a limpa.
+  2. O subject do chamador vinha de um `JsonWebToken` injetado por CDI, que o `@JwtSecurity`
+     não popula (ele instala o token como **principal** da identidade). `JwtCallerContext`
+     passou a ler o principal — que com OIDC bearer é o próprio token, valendo em produção e
+     em teste.
 
 **Pendências locais — também resolvidas:**
 - ✅ **Idempotência de reemissão** — `UNIQUE` em `previous_virtual_card_id`/`previous_physical_card_id` (V6): cada cartão é predecessor de no máximo um novo cartão (barreira de concorrência). Retry sequencial já era barrado pelo estado (cartão antigo inativo → 403). Prova: `CardsFlowIntegrationTest.reissueIsNotDuplicatedForTheSameCard` (CI).
 
 **Remanescente (documentado, fora de escopo imediato):**
 - Segredos default no `docker-compose` permanecem para dev (documentado); produção usa env sem default.
-- Polimento opcional: mapear violação de constraint de concorrência para HTTP 409 (hoje a duplicata é impedida; o perdedor da corrida recebe erro genérico). Requer teste de integração para validar o tipo de exceção — adiado.
+- ✅ **Conflito de reemissão virou 409** (antes o perdedor da corrida recebia 500). O adaptador de
+  persistência antecipa o flush e traduz **apenas** a violação de `uk_physical_cards_previous` /
+  `uk_virtual_cards_previous` em `ConflictException`; qualquer outra falha de persistência
+  continua subindo como está (`UniqueConflictsTest`, 5 casos). Corrida real por HTTP com banco
+  real em `ReissueConcurrencyIntegrationTest`: um cartão novo ao final, vencedor 200 e perdedor
+  em conflito estável (403 pelo estado ou 409 pela restrição), nunca 5xx. Caso determinístico da
+  restrição em `ReissueUniquenessIntegrationTest`.
+- Segredos default no `docker-compose` permanecem para dev (documentado); produção usa env sem default.
 
 Ver `PACOTE-COMERCIAL.md` para a oferta e `EVIDENCIAS.md` para comandos/versões/provas.

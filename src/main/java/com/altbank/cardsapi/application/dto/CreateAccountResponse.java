@@ -6,6 +6,7 @@ public record CreateAccountResponse(
         UUID customerId,
         UUID accountId,
         UUID physicalCardId,
-        String trackingId
+        String trackingId,
+        String shipmentStatus
 ) {
 }
