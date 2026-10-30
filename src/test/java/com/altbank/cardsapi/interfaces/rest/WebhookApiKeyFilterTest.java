@@ -58,4 +58,27 @@ class WebhookApiKeyFilterTest {
 
         verify(requestContext, never()).getHeaderString(any());
     }
+
+    @Test
+    void filter_carrierPathWithLeadingSlash_badKey_shouldThrow() throws Exception {
+        WebhookApiKeyFilter filter = new WebhookApiKeyFilter("c-secret", "p-secret");
+
+        Mockito.when(requestContext.getUriInfo()).thenReturn(uriInfo);
+        Mockito.when(uriInfo.getPath()).thenReturn("/webhooks/carrier/delivery");
+        Mockito.when(requestContext.getHeaderString(WebhookApiKeyFilter.HEADER_NAME)).thenReturn("wrong");
+
+        UnauthorizedException ex = Assertions.assertThrows(UnauthorizedException.class, () -> filter.filter(requestContext));
+        Assertions.assertEquals(ErrorCode.WEBHOOK_UNAUTHORIZED, ex.errorCode());
+    }
+
+    @Test
+    void filter_processorPathWithLeadingSlash_missingKey_shouldThrow() throws Exception {
+        WebhookApiKeyFilter filter = new WebhookApiKeyFilter("c-secret", "p-secret");
+
+        Mockito.when(requestContext.getUriInfo()).thenReturn(uriInfo);
+        Mockito.when(uriInfo.getPath()).thenReturn("/webhooks/processor/cvv-rotation");
+        Mockito.when(requestContext.getHeaderString(WebhookApiKeyFilter.HEADER_NAME)).thenReturn(null);
+
+        Assertions.assertThrows(UnauthorizedException.class, () -> filter.filter(requestContext));
+    }
 }
