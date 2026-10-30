@@ -2,8 +2,8 @@ package com.altbank.cardsapi.infrastructure.external;
 
 import com.altbank.cardsapi.application.port.CarrierPort;
 import com.altbank.cardsapi.domain.model.DeliveryStatus;
-import io.quarkus.arc.profile.UnlessBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Typed;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -12,10 +12,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Transportadora simulada para dev/test e demonstracao sintetica, com comportamento controlavel:
  * aceita por padrao, e pode recusar ou falhar a proxima chamada para exercitar a orquestracao.
- * Restrito a perfis diferentes de "prod" (ver ProductionReadinessGuard).
+ * Selecionado em tempo de execucao por {@link ExternalAdapterProducers} quando
+ * {@code cards.carrier.adapter=simulator}; em producao o ProductionReadinessGuard recusa iniciar.
  */
 @ApplicationScoped
-@UnlessBuildProfile("prod")
+@Typed(InMemoryCarrierAdapter.class)
 public class InMemoryCarrierAdapter implements CarrierPort {
 
     private enum Next { REJECT, FAIL }

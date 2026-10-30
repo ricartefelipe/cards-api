@@ -1,8 +1,6 @@
 package com.altbank.cardsapi.infrastructure.external;
 
 import com.altbank.cardsapi.application.port.ProcessorPort;
-import io.quarkus.arc.profile.IfBuildProfile;
-import jakarta.enterprise.context.ApplicationScoped;
 import java.time.LocalDateTime;
 
 /**
@@ -11,8 +9,6 @@ import java.time.LocalDateTime;
  * explicita. A inicializacao de producao ja e bloqueada antes (ProductionReadinessGuard);
  * esta classe e a segunda barreira, caso o gate seja afrouxado por configuracao.
  */
-@ApplicationScoped
-@IfBuildProfile("prod")
 public class UnconfiguredProcessorPort implements ProcessorPort {
 
     private static final String MESSAGE =

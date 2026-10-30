@@ -30,7 +30,8 @@ public final class ProductionReadiness {
         return List.copyOf(problems);
     }
 
-    private static boolean isSimulator(String adapter) {
+    /** Nome de adaptador que designa o simulador em memoria (ou ausencia de adaptador). */
+    public static boolean isSimulator(String adapter) {
         return adapter == null || adapter.isBlank() || SIMULATOR.equalsIgnoreCase(adapter.strip());
     }
 }
