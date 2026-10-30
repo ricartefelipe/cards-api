@@ -40,10 +40,11 @@ services:
       timeout: 5s
       retries: 30
 
-  # ATENCAO: esta imagem roda no perfil de PRODUCAO, que e fail-closed: sem adaptador
-  # real de processadora/transportadora contratado, a inicializacao e recusada
-  # (ProductionReadinessGuard) e o healthcheck nunca fica saudavel. Para uma DEMO
-  # funcional com simuladores, use `mvn quarkus:dev` (perfil dev, claramente demo).
+  # Perfil de execucao da imagem final (QUARKUS_PROFILE):
+  #   prod (padrao): fail-closed — sem adaptador real de processadora/transportadora
+  #                  contratado, a inicializacao e recusada (ProductionReadinessGuard).
+  #   demo: a MESMA imagem com simuladores e o Keycloak local, para demonstracao/
+  #         homologacao funcional. Nunca use demo em producao.
   cards-api:
     build:
       context: .
@@ -51,6 +52,7 @@ services:
     ports:
       - "${PORT:-8080}:8080"
     environment:
+      QUARKUS_PROFILE: ${QUARKUS_PROFILE:-prod}
       PORT: "8080"
       DB_JDBC_URL: jdbc:mariadb://mysql:3306/cards_api?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       DB_USERNAME: ${DB_USERNAME:-cards}

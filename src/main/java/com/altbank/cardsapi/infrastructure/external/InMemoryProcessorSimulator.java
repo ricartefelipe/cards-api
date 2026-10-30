@@ -4,8 +4,8 @@ import jakarta.inject.Inject;
 import com.altbank.cardsapi.application.exception.ErrorCode;
 import com.altbank.cardsapi.application.exception.NotFoundException;
 import com.altbank.cardsapi.application.port.ProcessorPort;
-import io.quarkus.arc.profile.UnlessBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Typed;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * fail-closed de producao (ProductionReadinessGuard) bloqueia a inicializacao.
  */
 @ApplicationScoped
-@UnlessBuildProfile("prod")
+@Typed(InMemoryProcessorSimulator.class)
 public class InMemoryProcessorSimulator implements ProcessorPort {
 
     private final long defaultTtlSeconds;
