@@ -1,7 +1,7 @@
 package com.altbank.cardsapi.infrastructure.config;
 
-import io.quarkus.arc.profile.IfBuildProfile;
 import io.quarkus.runtime.StartupEvent;
+import io.quarkus.runtime.configuration.ConfigUtils;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import java.util.List;
@@ -9,12 +9,16 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
  * Bloqueia a inicializacao em producao quando nao ha adaptador real de processadora/
- * transportadora contratado (modalidade sandbox/kit). Ativo apenas no perfil "prod".
- * Os segredos obrigatorios ja falham antes por nao terem default em prod.
+ * transportadora contratado (modalidade sandbox/kit).
+ *
+ * <p>A decisao usa o perfil de <em>execucao</em>, nao o de build: a mesma imagem final
+ * (construida no perfil prod) pode subir no perfil {@code demo} com simuladores, e continua
+ * recusando iniciar quando o perfil de execucao e {@code prod}.
  */
 @ApplicationScoped
-@IfBuildProfile("prod")
 public class ProductionReadinessGuard {
+
+    static final String PRODUCTION_PROFILE = "prod";
 
     private final String processorAdapter;
     private final String carrierAdapter;
@@ -27,6 +31,9 @@ public class ProductionReadinessGuard {
     }
 
     void onStart(@Observes StartupEvent event) {
+        if (!ConfigUtils.getProfiles().contains(PRODUCTION_PROFILE)) {
+            return;
+        }
         List<String> problems = ProductionReadiness.problems(processorAdapter, carrierAdapter);
         if (!problems.isEmpty()) {
             throw new IllegalStateException(

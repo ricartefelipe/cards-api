@@ -79,6 +79,24 @@ Endpoints locais:
 
 Flyway aplica as migrations automaticamente no startup.
 
+## Perfis de execução da imagem final
+
+A imagem construída pelo `Dockerfile` é única; o perfil de execução é escolhido por `QUARKUS_PROFILE`:
+
+| Perfil | Uso | Adaptadores | Comportamento |
+|---|---|---|---|
+| `prod` (padrão) | produção | reais, contratados (`PROCESSOR_ADAPTER`, `CARRIER_ADAPTER`) | fail-closed: com simulador configurado a inicialização é recusada (`ProductionReadinessGuard`); segredos sem default |
+| `demo` | demonstração/homologação funcional, nunca produção | simuladores em memória (padrão) | mesma imagem, Keycloak local, chaves de webhook com default local |
+
+Exemplo da demo com a stack do Compose (MariaDB + Keycloak):
+
+```bash
+QUARKUS_PROFILE=demo docker compose up -d --build
+curl http://localhost:8080/q/health/ready
+```
+
+O health da plataforma (`railway.toml`, healthcheck do Compose) é `/q/health/ready`; `/q/health/live` também está disponível.
+
 ## Banco local
 
 O serviço MariaDB do Compose utiliza:

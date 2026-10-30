@@ -1,16 +1,12 @@
 package com.altbank.cardsapi.infrastructure.external;
 
 import com.altbank.cardsapi.application.port.CarrierPort;
-import io.quarkus.arc.profile.IfBuildProfile;
-import jakarta.enterprise.context.ApplicationScoped;
 
 /**
  * Adaptador fail-closed de transportadora para producao sem parceiro contratado.
  * Satisfaz a injecao de {@link CarrierPort}; qualquer operacao real falha explicitamente.
- * Barreira secundaria ao ProductionReadinessGuard.
+ * Barreira secundaria ao ProductionReadinessGuard; instanciado por {@link ExternalAdapterProducers}.
  */
-@ApplicationScoped
-@IfBuildProfile("prod")
 public class UnconfiguredCarrierPort implements CarrierPort {
 
     @Override
