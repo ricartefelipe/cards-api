@@ -19,6 +19,8 @@ import java.util.Objects;
 public class WebhookApiKeyFilter implements ContainerRequestFilter {
 
     public static final String HEADER_NAME = "X-Webhook-Api-Key";
+    private static final String CARRIER_PATH = "webhooks/carrier";
+    private static final String PROCESSOR_PATH = "webhooks/processor";
 
     private final String carrierApiKey;
     private final String processorApiKey;
@@ -36,11 +38,18 @@ public class WebhookApiKeyFilter implements ContainerRequestFilter {
         if (path == null) {
             return;
         }
-        if (path.startsWith("webhooks/carrier")) {
+        String relativePath = withoutLeadingSlash(path);
+        if (relativePath.startsWith(CARRIER_PATH)) {
             validateKey(requestContext, carrierApiKey);
-        } else if (path.startsWith("webhooks/processor")) {
+        } else if (relativePath.startsWith(PROCESSOR_PATH)) {
             validateKey(requestContext, processorApiKey);
         }
+    }
+
+    // O Quarkus REST entrega o caminho com barra inicial ("/webhooks/..."); sem normalizar, nenhum
+    // webhook era reconhecido e a chave nunca era exigida.
+    private static String withoutLeadingSlash(String path) {
+        return path.startsWith("/") ? path.substring(1) : path;
     }
 
     private void validateKey(ContainerRequestContext requestContext, String expected) {
