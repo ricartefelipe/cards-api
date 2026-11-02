@@ -52,7 +52,6 @@ source .env
 set +a
 
 echo "Subindo stack completa (Keycloak + MariaDB + cards-api)..."
-echo "Nota Railway: Keycloak torna o deploy single-service mais difícil; use este Compose para demo local."
 docker compose up -d --build
 
 echo "Aguardando health em ${HEALTH_URL}..."
