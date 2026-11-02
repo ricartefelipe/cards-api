@@ -95,7 +95,7 @@ QUARKUS_PROFILE=demo docker compose up -d --build
 curl http://localhost:8080/q/health/ready
 ```
 
-O health da plataforma (`railway.toml`, healthcheck do Compose) é `/q/health/ready`; `/q/health/live` também está disponível.
+O health usado pelo healthcheck do Compose é `/q/health/ready`; `/q/health/live` também está disponível.
 
 ## Banco local
 

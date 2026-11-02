@@ -30,7 +30,7 @@ ENV PORT=8080
 ENV JAVA_OPTS=""
 
 # Liveness: porta aceitando conexao. A readiness (HTTP /q/health/ready) e verificada
-# pela plataforma (railway.toml) e deve ser usada por orquestradores.
+# pelo healthcheck do Compose e deve ser usada por orquestradores.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
     CMD bash -c 'exec 3<>/dev/tcp/127.0.0.1/${PORT:-8080}' || exit 1
 
