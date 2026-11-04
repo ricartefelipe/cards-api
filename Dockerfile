@@ -15,6 +15,10 @@ RUN mvn -ntp -DskipTests package
 
 # eclipse-temurin:21-jre
 FROM eclipse-temurin@sha256:ff92a063dac03a29fca3987bcfc66aa5f17769542df802bbf7d2ebaba4df8ebe
+# Correcoes de seguranca da base publicadas depois da imagem entram em cada build.
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 COPY --from=build /workspace/target/quarkus-app /app
