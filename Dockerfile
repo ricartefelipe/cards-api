@@ -3,8 +3,8 @@
 # Imagens fixadas por digest de indice multi-arch (reproduzivel). Atualizacao: rode
 #   docker buildx imagetools inspect <imagem>:<tag>
 # e substitua o digest. Tag mantida no comentario apenas como referencia legivel.
-# maven:3.9.6-eclipse-temurin-21
-FROM maven@sha256:8d63d4c1902cb12d9e79a70671b18ebe26358cb592561af33ca1808f00d935cb AS build
+# maven:3.9.16-eclipse-temurin-21
+FROM maven@sha256:99e61abcff91a9b1333463bd8451fb18495d6eba9250ac66a338b518f8278320 AS build
 WORKDIR /workspace
 
 COPY pom.xml .
@@ -14,7 +14,7 @@ COPY src ./src
 RUN mvn -ntp -DskipTests package
 
 # eclipse-temurin:21-jre
-FROM eclipse-temurin@sha256:ff92a063dac03a29fca3987bcfc66aa5f17769542df802bbf7d2ebaba4df8ebe
+FROM eclipse-temurin@sha256:0b99b3376fbb50dbf9c0af8535fdd5b8eb0d3fdfc8b1e4967f383b6919f6901a
 # Correcoes de seguranca da base publicadas depois da imagem entram em cada build.
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y --no-install-recommends \
